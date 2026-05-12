@@ -1163,102 +1163,114 @@ export default function BirdLifeTracker() {
 
   return (
     <div className="font-body min-h-screen w-full relative overflow-hidden" style={{
-      background: 'radial-gradient(ellipse at top, #f3ead8 0%, #ede2c8 60%, #e6d8b8 100%)',
-      color: '#2a2417',
+      background: '#0c1f1f',
+      color: '#f5f5f4',
     }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,300..900,0..100,0..1&family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..700&family=JetBrains+Mono:wght@400;500&display=swap');
-        .font-display { font-family: 'Fraunces', 'Cormorant Garamond', Georgia, serif; font-feature-settings: 'onum' 1, 'ss01' 1; font-variation-settings: 'opsz' 144, 'SOFT' 30, 'WONK' 1; letter-spacing: -0.02em; }
-        .font-body { font-family: 'Newsreader', Georgia, serif; font-feature-settings: 'onum' 1; }
-        .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
-        .ink { color: #2a2417; }
-        .ink-soft { color: #6b5a3d; }
-        .ink-faint { color: #998561; }
-        .rust { color: #b04a25; }
-        .moss { color: #3d5235; }
-        .grain {
-          background-image:
-            radial-gradient(rgba(80,60,30,0.10) 1px, transparent 1px),
-            radial-gradient(rgba(60,40,20,0.06) 1px, transparent 1px);
-          background-size: 3px 3px, 7px 7px;
-          background-position: 0 0, 1px 1px;
-        }
-        .rule { border-color: rgba(80,60,30,0.35); }
-        .rule-dashed { background-image: linear-gradient(to right, rgba(80,60,30,0.45) 50%, transparent 50%); background-size: 8px 1px; background-repeat: repeat-x; height: 1px; }
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+        /* Typography */
+        .font-display { font-family: 'Montserrat', system-ui, sans-serif; letter-spacing: -0.025em; font-feature-settings: 'tnum' 1; }
+        .font-body { font-family: 'Montserrat', system-ui, sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-feature-settings: 'tnum' 1; }
+
+        /* Text colors */
+        .ink { color: #f5f5f4; }
+        .ink-soft { color: #a8b1ae; }
+        .ink-faint { color: #6b7773; }
+
+        /* Accents (punchier) */
+        .rust { color: #fb923c; }        /* warm orange — primary brand */
+        .moss { color: #4ade80; }        /* emerald — seen/found indicator */
+        .teal { color: #2dd4bf; }        /* secondary accent */
+
+        /* Surfaces */
+        .surface-1 { background: #142926; border: 1px solid rgba(255,255,255,0.06); }
+        .surface-2 { background: #1c3531; border: 1px solid rgba(255,255,255,0.08); }
+        .grain { /* parchment texture retired */ }
+
+        /* Rules / dividers */
+        .rule { border-color: rgba(255,255,255,0.10); }
+        .rule-dashed { background-image: linear-gradient(to right, rgba(255,255,255,0.20) 50%, transparent 50%); background-size: 8px 1px; background-repeat: repeat-x; height: 1px; }
+
+        /* Animations */
         @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .anim-1 { animation: fadeUp 0.7s 0.05s both ease-out; }
-        .anim-2 { animation: fadeUp 0.7s 0.20s both ease-out; }
-        .anim-3 { animation: fadeUp 0.7s 0.35s both ease-out; }
-        .anim-4 { animation: fadeUp 0.7s 0.50s both ease-out; }
-        .anim-5 { animation: fadeUp 0.7s 0.65s both ease-out; }
-        .toast { animation: fadeIn 0.3s ease-out; }
+        .anim-1 { animation: fadeUp 0.5s 0.05s both ease-out; }
+        .anim-2 { animation: fadeUp 0.5s 0.15s both ease-out; }
+        .anim-3 { animation: fadeUp 0.5s 0.25s both ease-out; }
+        .anim-4 { animation: fadeUp 0.5s 0.35s both ease-out; }
+        .anim-5 { animation: fadeUp 0.5s 0.45s both ease-out; }
+        .toast { animation: fadeIn 0.25s ease-out; }
+
+        /* Pill / chip — was the rust 'stamp' */
         .stamp {
-          border: 1.5px solid #b04a25;
-          color: #b04a25;
-          padding: 4px 10px;
-          font-family: 'JetBrains Mono', monospace;
-          font-size: 10px;
-          letter-spacing: 0.18em;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 14px;
+          background: rgba(249, 115, 22, 0.10);
+          color: #fb923c;
+          font-family: 'Montserrat', system-ui, sans-serif;
+          font-weight: 600;
+          font-size: 11px;
+          letter-spacing: 0.12em;
           text-transform: uppercase;
-          transform: rotate(-2deg);
-          display: inline-block;
+          border: 1px solid rgba(249, 115, 22, 0.25);
+          border-radius: 999px;
         }
-        .btn-ink { background: #2a2417; color: #f3ead8; transition: all 0.2s; }
-        .btn-ink:hover { background: #1a160d; }
-        .btn-ink:disabled { background: #6b5a3d; cursor: not-allowed; }
-        .btn-ghost { background: transparent; color: #2a2417; border: 1px solid rgba(80,60,30,0.35); transition: all 0.2s; }
-        .btn-ghost:hover { background: rgba(80,60,30,0.08); }
-        .input-field { background: rgba(255,253,247,0.6); border: 1px solid rgba(80,60,30,0.35); color: #2a2417; }
-        .input-field:focus { outline: none; border-color: #b04a25; box-shadow: 0 0 0 3px rgba(176,74,37,0.15); }
-        .feather-bg { position: absolute; pointer-events: none; opacity: 0.06; }
-        .species-row { transition: background 0.15s; }
-        .species-row:hover { background: rgba(80,60,30,0.06); }
+
+        /* Buttons */
+        .btn-ink { background: #f97316; color: #0c1f1f; font-weight: 600; transition: all 0.15s; }
+        .btn-ink:hover { background: #fb923c; transform: translateY(-1px); }
+        .btn-ink:disabled { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.4); cursor: not-allowed; transform: none; }
+        .btn-ghost { background: rgba(255,255,255,0.04); color: #f5f5f4; border: 1px solid rgba(255,255,255,0.15); font-weight: 500; transition: all 0.15s; }
+        .btn-ghost:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.30); }
+        .btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* Inputs */
+        .input-field { background: rgba(0,0,0,0.20); border: 1px solid rgba(255,255,255,0.12); color: #f5f5f4; }
+        .input-field::placeholder { color: #6b7773; }
+        .input-field:focus { outline: none; border-color: #f97316; box-shadow: 0 0 0 3px rgba(249,115,22,0.15); }
+
+        /* Lists */
+        .species-row { transition: background 0.12s; }
+        .species-row:hover { background: rgba(255,255,255,0.04); }
+
+        /* Subtle hover lift on cards */
+        .lift { transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s; }
+        .lift:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.18); }
       `}</style>
 
-      <svg className="feather-bg" style={{ top: '8%', right: '-40px', width: '320px', transform: 'rotate(25deg)' }} viewBox="0 0 100 200" fill="none" stroke="#2a2417" strokeWidth="0.6">
-        <path d="M50 5 Q40 60 35 100 Q30 140 50 195 Q70 140 65 100 Q60 60 50 5 Z" />
-        {Array.from({ length: 28 }).map((_, i) => (
-          <line key={i} x1="50" y1={20 + i * 6} x2={i % 2 === 0 ? 25 : 75} y2={25 + i * 6} />
-        ))}
-        <line x1="50" y1="5" x2="50" y2="195" />
-      </svg>
-      <svg className="feather-bg" style={{ bottom: '5%', left: '-50px', width: '280px', transform: 'rotate(-160deg)' }} viewBox="0 0 100 200" fill="none" stroke="#2a2417" strokeWidth="0.6">
-        <path d="M50 5 Q40 60 35 100 Q30 140 50 195 Q70 140 65 100 Q60 60 50 5 Z" />
-        {Array.from({ length: 28 }).map((_, i) => (
-          <line key={i} x1="50" y1={20 + i * 6} x2={i % 2 === 0 ? 25 : 75} y2={25 + i * 6} />
-        ))}
-        <line x1="50" y1="5" x2="50" y2="195" />
-      </svg>
-
-      <div className="grain absolute inset-0 pointer-events-none" />
-
-      <div className="relative max-w-3xl mx-auto px-6 sm:px-10 py-10 sm:py-16">
-        <header className="anim-1 flex items-start justify-between mb-12 sm:mb-16">
-          <div>
-            <div className="flex items-center gap-2 mb-2 ink-soft">
-              <Feather size={14} strokeWidth={1.5} />
-              <span className="font-mono text-[10px] tracking-[0.25em] uppercase">Field Log №.01</span>
+      <div className="relative max-w-3xl mx-auto px-6 sm:px-10 py-8 sm:py-12">
+        <header className="anim-1 flex items-center justify-between mb-10 sm:mb-14">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(249,115,22,0.15)' }}>
+              <Feather size={16} strokeWidth={2} className="rust" />
             </div>
-            <h1 className="font-display text-2xl sm:text-3xl ink leading-none">A Continental Census</h1>
-            <p className="ink-soft text-sm mt-1 italic">of the species observed</p>
+            <div>
+              <h1 className="font-display text-base sm:text-lg ink leading-none" style={{ fontWeight: 700, letterSpacing: '0.02em' }}>
+                CENSUS
+              </h1>
+              <p className="font-mono text-[9px] ink-faint tracking-[0.2em] uppercase mt-1">United States</p>
+            </div>
           </div>
           <button
             onClick={() => setShowSettings(true)}
             className="btn-ghost rounded-full p-2.5"
             aria-label="Settings"
           >
-            <Settings size={16} strokeWidth={1.5} />
+            <Settings size={16} strokeWidth={2} />
           </button>
         </header>
 
         {empty && (
           <div className="anim-2">
             <div className="text-center mb-12">
-              <div className="stamp mb-6">Begin Your Reckoning</div>
-              <h2 className="font-display text-4xl sm:text-5xl ink mb-4 leading-tight">
+              <div className="stamp mb-6">Get Started</div>
+              <h2 className="font-display text-4xl sm:text-5xl ink mb-4 leading-[1.05]" style={{ fontWeight: 700 }}>
                 How many of America's<br />
-                <span className="italic">{TOTAL}</span> native birds<br />
+                <span className="rust">{TOTAL}</span> native birds<br />
                 have you seen?
               </h2>
               <p className="ink-soft max-w-md mx-auto leading-relaxed">
@@ -1268,12 +1280,14 @@ export default function BirdLifeTracker() {
             </div>
 
             <div className="max-w-md mx-auto mb-6">
-              <div className="bg-white/30 border rule p-6 relative">
+              <div className="surface-1 rounded-2xl p-6 relative">
                 <div className="absolute top-4 right-4 font-mono text-[10px] ink-faint tracking-widest">CSV</div>
-                <FileText size={20} strokeWidth={1.5} className="ink mb-3" />
-                <h3 className="font-display text-xl ink mb-2">Your sightings</h3>
-                <p className="text-sm ink-soft mb-4 leading-relaxed">
-                  At <span className="font-mono text-xs">ebird.org</span>: My eBird → Download My Data.
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center mb-3" style={{ background: 'rgba(249,115,22,0.10)' }}>
+                  <FileText size={20} strokeWidth={2} className="rust" />
+                </div>
+                <h3 className="font-display text-lg ink mb-2" style={{ fontWeight: 600 }}>Your sightings</h3>
+                <p className="text-sm ink-soft mb-5 leading-relaxed">
+                  At <span className="font-mono text-xs ink">ebird.org</span>: My eBird → Download My Data.
                   You'll be emailed a CSV — upload it here.
                 </p>
                 <input
@@ -1284,7 +1298,7 @@ export default function BirdLifeTracker() {
                   onChange={(e) => onCsvFile(e.target.files?.[0])}
                 />
                 <button
-                  className="btn-ink rounded-full px-4 py-2 text-sm flex items-center gap-2"
+                  className="btn-ink rounded-full px-5 py-2.5 text-sm flex items-center gap-2"
                   onClick={() => fileRef.current?.click()}
                   disabled={loading}
                 >
@@ -1294,128 +1308,118 @@ export default function BirdLifeTracker() {
               </div>
             </div>
 
-            <div className="text-center text-xs ink-faint italic flex items-center justify-center gap-3 flex-wrap">
-              <button onClick={() => setShowList(true)} className="underline hover:no-underline">
+            <div className="text-center text-xs ink-faint flex items-center justify-center gap-3 flex-wrap">
+              <button onClick={() => setShowList(true)} className="hover:ink transition-colors">
                 Browse the list of {TOTAL}
               </button>
               <span>·</span>
-              <button onClick={() => setShowAbout(true)} className="underline hover:no-underline">
+              <button onClick={() => setShowAbout(true)} className="hover:ink transition-colors">
                 What's the {TOTAL}?
               </button>
               <span>·</span>
-              <span>Stored locally.</span>
+              <span>Stored locally</span>
             </div>
           </div>
         )}
 
         {!empty && hydrated && (
           <main>
-            <div className="text-center mb-2 anim-2">
-              <div className="font-mono text-[10px] ink-faint tracking-[0.3em] uppercase">United States · Native Life List</div>
+            <div className="text-center mb-3 anim-2">
+              <div className="font-mono text-[10px] ink-faint tracking-[0.3em] uppercase">Native Life List</div>
             </div>
 
             <div className="text-center mb-2 anim-2">
               <div
                 className="font-display ink leading-none"
-                style={{ fontSize: 'clamp(7rem, 22vw, 13rem)', fontVariationSettings: "'opsz' 144, 'WONK' 1, 'SOFT' 30, 'wght' 380" }}
+                style={{ fontSize: 'clamp(6.5rem, 20vw, 11rem)', fontWeight: 800, letterSpacing: '-0.04em' }}
               >
                 {userCount != null ? fmt(userCount) : '—'}
               </div>
             </div>
 
-            <div className="text-center mb-8 anim-3">
-              <div className="inline-flex items-center gap-3">
-                <span className="rule-dashed w-12" />
-                <span className="font-display italic ink-soft" style={{ fontSize: '1.25rem' }}>
-                  of {fmt(TOTAL)}
-                </span>
-                <span className="rule-dashed w-12" />
-              </div>
+            <div className="text-center mb-10 anim-3">
+              <span className="font-display ink-soft" style={{ fontSize: '1rem', fontWeight: 500, letterSpacing: '0.02em' }}>
+                of {fmt(TOTAL)} species
+              </span>
             </div>
 
             <div className="mb-3 anim-4">
-              <div className="flex items-baseline justify-between mb-2">
-                <span className="font-display rust" style={{ fontSize: '1.4rem', fontVariationSettings: "'wght' 500" }}>
+              <div className="flex items-baseline justify-between mb-2.5">
+                <span className="font-display rust" style={{ fontSize: '1.5rem', fontWeight: 700 }}>
                   {pct != null ? `${pct.toFixed(1)}%` : '—'}
                 </span>
-                <span className="text-xs ink-soft italic">
-                  {remaining != null ? `${fmt(remaining)} yet to find` : ''}
+                <span className="text-xs ink-soft font-mono">
+                  {remaining != null ? `${fmt(remaining)} to go` : ''}
                 </span>
               </div>
-              <div className="relative h-[3px] bg-[rgba(80,60,30,0.18)] overflow-hidden">
+              <div className="relative h-2 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
                 <div
-                  className="absolute inset-y-0 left-0"
+                  className="absolute inset-y-0 left-0 rounded-full"
                   style={{
                     width: `${progressAnim * 100}%`,
-                    background: 'linear-gradient(90deg, #b04a25 0%, #c9542b 100%)',
+                    background: 'linear-gradient(90deg, #f97316 0%, #fb923c 100%)',
+                    boxShadow: '0 0 12px rgba(249,115,22,0.4)',
                   }}
                 />
-                {[0.25, 0.5, 0.75].map(t => (
-                  <div key={t} className="absolute top-0 bottom-0 w-px bg-[rgba(80,60,30,0.4)]" style={{ left: `${t * 100}%` }} />
-                ))}
               </div>
             </div>
 
-            {/* View buttons — prominent under the progress bar */}
-            <div className="mt-6 anim-4 text-center flex flex-wrap items-center justify-center gap-2">
+            {/* View buttons */}
+            <div className="mt-6 anim-4 flex flex-wrap items-center justify-center gap-2">
               <button
                 onClick={() => setShowList(true)}
-                className="btn-ghost rounded-full px-5 py-2 text-sm inline-flex items-center gap-2"
+                className="btn-ghost rounded-full px-5 py-2.5 text-sm inline-flex items-center gap-2"
               >
-                <List size={14} />
-                Browse all {TOTAL} species
+                <List size={14} strokeWidth={2} />
+                Browse all {TOTAL}
               </button>
               {points && points.length > 0 && (
                 <button
                   onClick={() => setShowMap(true)}
-                  className="btn-ghost rounded-full px-5 py-2 text-sm inline-flex items-center gap-2"
+                  className="btn-ghost rounded-full px-5 py-2.5 text-sm inline-flex items-center gap-2"
                 >
-                  <MapIcon size={14} />
+                  <MapIcon size={14} strokeWidth={2} />
                   Sightings map
                 </button>
               )}
             </div>
 
-            <div className="rule-dashed mt-12 mb-8 anim-5" />
-
-            <div className="grid sm:grid-cols-3 gap-y-6 gap-x-8 anim-5">
-              <div>
-                <div className="font-mono text-[10px] ink-faint tracking-widest uppercase mb-1">Observations</div>
-                <div className="font-display ink" style={{ fontSize: '1.35rem' }}>
+            <div className="grid sm:grid-cols-3 gap-3 mt-10 anim-5">
+              <div className="surface-1 rounded-2xl p-4">
+                <div className="font-mono text-[10px] ink-faint tracking-widest uppercase mb-2">Observations</div>
+                <div className="font-display ink" style={{ fontSize: '1.5rem', fontWeight: 700 }}>
                   {csvMeta ? fmt(csvMeta.observations) : '—'}
                 </div>
               </div>
-              <div>
-                <div className="font-mono text-[10px] ink-faint tracking-widest uppercase mb-1">First sighting</div>
-                <div className="font-display ink italic" style={{ fontSize: '1.05rem' }}>
+              <div className="surface-1 rounded-2xl p-4">
+                <div className="font-mono text-[10px] ink-faint tracking-widest uppercase mb-2">First sighting</div>
+                <div className="font-display ink" style={{ fontSize: '0.95rem', fontWeight: 500 }}>
                   {csvMeta?.earliest ? fmtDate(csvMeta.earliest) : '—'}
                 </div>
               </div>
-              <div>
-                <div className="font-mono text-[10px] ink-faint tracking-widest uppercase mb-1">Latest entry</div>
-                <div className="font-display ink italic" style={{ fontSize: '1.05rem' }}>
+              <div className="surface-1 rounded-2xl p-4">
+                <div className="font-mono text-[10px] ink-faint tracking-widest uppercase mb-2">Latest entry</div>
+                <div className="font-display ink" style={{ fontSize: '0.95rem', fontWeight: 500 }}>
                   {csvMeta?.latest ? fmtDate(csvMeta.latest) : '—'}
                 </div>
               </div>
             </div>
 
             {csvMeta?.allCount != null && userCount != null && csvMeta.allCount > userCount && (
-              <div className="mt-8 anim-5">
-                <div className="text-xs ink-soft italic leading-relaxed">
-                  Your CSV holds <span className="font-mono not-italic">{fmt(csvMeta.allCount)}</span> distinct US species in total
-                  — <span className="font-mono not-italic">{fmt(csvMeta.allCount - userCount)}</span> are excluded from the count above
+              <div className="mt-6 anim-5">
+                <div className="text-xs ink-soft leading-relaxed">
+                  Your CSV holds <span className="font-mono ink">{fmt(csvMeta.allCount)}</span> distinct US species in total
+                  — <span className="font-mono ink">{fmt(csvMeta.allCount - userCount)}</span> are excluded from the count
                   as introduced exotics or rare visitors from other continents.
                 </div>
               </div>
             )}
 
-            <div className="rule-dashed mt-10 mb-6 anim-5" />
-
-            <div className="flex flex-wrap items-center justify-between gap-4 anim-5">
+            <div className="mt-10 pt-6 border-t rule flex flex-wrap items-center justify-between gap-4 anim-5">
               <div className="font-mono text-[10px] ink-faint tracking-wider">
                 <div>Updated <span className="ink-soft">{csvMeta ? relativeTime(csvMeta.updatedAt) : '—'}</span></div>
-                <div>
-                  <button onClick={() => setShowAbout(true)} className="ink-soft hover:ink underline">about the {TOTAL}</button>
+                <div className="mt-0.5">
+                  <button onClick={() => setShowAbout(true)} className="ink-soft hover:ink transition-colors">about the {TOTAL}</button>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -1427,7 +1431,7 @@ export default function BirdLifeTracker() {
                   onChange={(e) => onCsvFile(e.target.files?.[0])}
                 />
                 <button
-                  className="btn-ghost rounded-full px-3 py-1.5 text-xs flex items-center gap-1.5"
+                  className="btn-ghost rounded-full px-3.5 py-2 text-xs flex items-center gap-1.5"
                   onClick={() => fileRef.current?.click()}
                   disabled={loading}
                 >
@@ -1450,7 +1454,13 @@ export default function BirdLifeTracker() {
       {/* toasts */}
       {(error || success) && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 toast z-50 max-w-md w-[90%]">
-          <div className={`flex items-start gap-3 px-4 py-3 shadow-lg ${error ? 'bg-[#3d1d10] text-[#f3ead8]' : 'bg-[#2d3d28] text-[#f3ead8]'}`}>
+          <div className={`flex items-start gap-3 px-4 py-3 rounded-2xl backdrop-blur-md ${error ? '' : ''}`}
+               style={{
+                 background: error ? 'rgba(127, 29, 29, 0.85)' : 'rgba(20, 83, 45, 0.85)',
+                 border: `1px solid ${error ? 'rgba(248, 113, 113, 0.30)' : 'rgba(74, 222, 128, 0.30)'}`,
+                 color: '#f5f5f4',
+                 boxShadow: '0 12px 32px rgba(0,0,0,0.4)',
+               }}>
             {error ? <AlertCircle size={18} className="shrink-0 mt-0.5" /> : <Check size={18} className="shrink-0 mt-0.5" />}
             <div className="flex-1 text-sm leading-relaxed">{error || success}</div>
             <button onClick={() => { setError(null); setSuccess(null); }} className="opacity-70 hover:opacity-100">
@@ -1468,60 +1478,62 @@ export default function BirdLifeTracker() {
 
       {/* settings drawer */}
       {showSettings && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-[rgba(20,15,5,0.5)]" onClick={() => setShowSettings(false)}>
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }} onClick={() => setShowSettings(false)}>
           <div
-            className="grain max-w-md w-full p-8 relative"
-            style={{ background: '#f3ead8', boxShadow: '0 30px 80px rgba(0,0,0,0.3)' }}
+            className="surface-2 rounded-2xl max-w-md w-full p-7 relative"
+            style={{ boxShadow: '0 30px 80px rgba(0,0,0,0.5)' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <button onClick={() => setShowSettings(false)} className="absolute top-4 right-4 ink-soft hover:ink">
+            <button onClick={() => setShowSettings(false)} className="absolute top-4 right-4 ink-soft hover:ink transition-colors">
               <X size={18} />
             </button>
             <div className="font-mono text-[10px] ink-faint tracking-[0.25em] uppercase mb-1">Settings</div>
-            <h2 className="font-display ink text-2xl mb-6">Configuration</h2>
+            <h2 className="font-display ink text-2xl mb-6" style={{ fontWeight: 700 }}>Configuration</h2>
 
             <label className="block mb-6">
               <span className="font-mono text-[10px] ink-faint tracking-widest uppercase block mb-2">Re-upload CSV</span>
               <input
                 type="file"
                 accept=".csv,text/csv"
-                className="text-xs ink-soft block w-full file:mr-3 file:px-3 file:py-1.5 file:rounded-full file:border-0 file:text-xs file:bg-[#2a2417] file:text-[#f3ead8] file:cursor-pointer hover:file:bg-[#1a160d]"
+                className="text-xs ink-soft block w-full file:mr-3 file:px-3 file:py-1.5 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-[#f97316] file:text-[#0c1f1f] file:cursor-pointer hover:file:bg-[#fb923c]"
                 onChange={(e) => onCsvFile(e.target.files?.[0])}
               />
               {csvMeta && (
-                <span className="text-xs ink-faint italic mt-1.5 block">
+                <span className="text-xs ink-faint mt-2 block">
                   Current: {csvMeta.fileName || 'data.csv'} · {fmt(csvMeta.observations)} obs · {relativeTime(csvMeta.updatedAt)}
                 </span>
               )}
             </label>
 
-            <div className="rule-dashed my-6" />
+            <div className="border-t rule my-6" />
 
-            <button
-              onClick={() => { setShowList(true); setShowSettings(false); }}
-              className="font-display italic ink-soft hover:ink text-sm block mb-3"
-            >
-              Browse all {TOTAL} species →
-            </button>
-            {points && points.length > 0 && (
+            <div className="space-y-1">
               <button
-                onClick={() => { setShowMap(true); setShowSettings(false); }}
-                className="font-display italic ink-soft hover:ink text-sm block mb-3"
+                onClick={() => { setShowList(true); setShowSettings(false); }}
+                className="block w-full text-left px-3 py-2 rounded-lg ink-soft hover:ink hover:bg-white/5 text-sm transition-colors"
               >
-                Sightings map →
+                Browse all {TOTAL} species →
               </button>
-            )}
-            <button
-              onClick={() => { setShowAbout(true); setShowSettings(false); }}
-              className="font-display italic ink-soft hover:ink text-sm block mb-6"
-            >
-              About the {TOTAL} →
-            </button>
+              {points && points.length > 0 && (
+                <button
+                  onClick={() => { setShowMap(true); setShowSettings(false); }}
+                  className="block w-full text-left px-3 py-2 rounded-lg ink-soft hover:ink hover:bg-white/5 text-sm transition-colors"
+                >
+                  Sightings map →
+                </button>
+              )}
+              <button
+                onClick={() => { setShowAbout(true); setShowSettings(false); }}
+                className="block w-full text-left px-3 py-2 rounded-lg ink-soft hover:ink hover:bg-white/5 text-sm transition-colors"
+              >
+                About the {TOTAL} →
+              </button>
+            </div>
 
-            <div className="rule-dashed my-6" />
+            <div className="border-t rule my-6" />
 
             <div className="flex items-center justify-between gap-3">
-              <button onClick={resetAll} className="text-xs rust hover:underline italic">Clear all data</button>
+              <button onClick={resetAll} className="text-xs rust hover:underline">Clear all data</button>
               <button onClick={() => setShowSettings(false)} className="btn-ink rounded-full px-5 py-2 text-sm">
                 Done
               </button>
@@ -1532,27 +1544,27 @@ export default function BirdLifeTracker() {
 
       {/* about drawer */}
       {showAbout && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-[rgba(20,15,5,0.5)]" onClick={() => setShowAbout(false)}>
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }} onClick={() => setShowAbout(false)}>
           <div
-            className="grain max-w-lg w-full p-8 relative max-h-[85vh] overflow-y-auto"
-            style={{ background: '#f3ead8', boxShadow: '0 30px 80px rgba(0,0,0,0.3)' }}
+            className="surface-2 rounded-2xl max-w-lg w-full p-7 relative max-h-[85vh] overflow-y-auto"
+            style={{ boxShadow: '0 30px 80px rgba(0,0,0,0.5)' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <button onClick={() => setShowAbout(false)} className="absolute top-4 right-4 ink-soft hover:ink">
+            <button onClick={() => setShowAbout(false)} className="absolute top-4 right-4 ink-soft hover:ink transition-colors">
               <X size={18} />
             </button>
             <div className="font-mono text-[10px] ink-faint tracking-[0.25em] uppercase mb-1">Methodology</div>
-            <h2 className="font-display ink text-3xl mb-1">Why <span className="italic rust">{TOTAL}</span>?</h2>
-            <p className="ink-soft text-sm italic mb-6">a derivation</p>
+            <h2 className="font-display ink text-3xl mb-1" style={{ fontWeight: 700 }}>Why <span className="rust">{TOTAL}</span>?</h2>
+            <p className="ink-soft text-sm mb-6">A derivation</p>
 
-            <div className="text-sm ink leading-relaxed space-y-3">
+            <div className="text-sm ink-soft leading-relaxed space-y-3">
               <p>
-                The starting point is the <span className="italic">ABA Checklist v8.0.7</span> — the American Birding
+                The starting point is the <span className="ink">ABA Checklist v8.0.7</span> — the American Birding
                 Association's official catalogue of every species reliably documented in the ABA Area
-                (lower 48, Alaska, Hawaii, Canada). Total: <span className="font-mono">1,120 species</span>.
+                (lower 48, Alaska, Hawaii, Canada). Total: <span className="font-mono ink">1,120 species</span>.
               </p>
               <p>Each species is assigned a code 1–6 by the ABA Checklist Committee:</p>
-              <div className="font-mono text-xs ink-soft pl-2 space-y-1 my-3">
+              <div className="font-mono text-xs pl-2 space-y-1 my-3">
                 <div><span className="rust">1–2</span> · regular breeders & visitors</div>
                 <div><span className="rust">3</span> · rare but annual</div>
                 <div className="ink-faint">4 · casual (less than annual) ← excluded</div>
@@ -1561,29 +1573,29 @@ export default function BirdLifeTracker() {
               </div>
               <p>
                 Codes 4 and 5 are where things like Steller's Sea-Eagle live — exciting finds, but
-                not "America's birds" in any meaningful sense. Excluding them leaves <span className="font-mono">826</span>.
+                not "America's birds" in any meaningful sense. Excluding them leaves <span className="font-mono ink">826</span>.
               </p>
               <p>
-                Then the established exotics get pulled out — the <span className="font-mono">52</span> species
-                on the ABA's separate <span className="italic">Introduced Species</span> list whose entire ABA-Area
+                Then the established exotics get pulled out — the <span className="font-mono ink">52</span> species
+                on the ABA's separate Introduced Species list whose entire ABA-Area
                 presence is non-native: House Sparrow, European Starling, Rock Pigeon, all the Hawaiian
                 introductions, Eurasian Collared-Dove, naturalized parrots, and so on.
               </p>
-              <p className="font-display italic" style={{ fontSize: '1.05rem' }}>
-                <span className="font-mono not-italic">826 − 52 = </span>
-                <span className="rust">{TOTAL}</span>.
+              <p className="font-display py-2" style={{ fontSize: '1.05rem', fontWeight: 600 }}>
+                <span className="font-mono ink">826 − 52 = </span>
+                <span className="rust">{TOTAL}</span>
               </p>
-              <p className="ink-soft">
+              <p>
                 Species native to the mainland US that were also introduced to Hawaii — Mallard, Wild
-                Turkey, Northern Cardinal, House Finch, etc. — are <em>kept</em>, since they have legitimate
+                Turkey, Northern Cardinal, House Finch, etc. — are kept, since they have legitimate
                 native US populations. Cattle Egret stays (self-introduced naturally from Africa via South
                 America). California Condor stays (native, reintroduced).
               </p>
-              <p className="ink-soft">
+              <p>
                 Your uploaded CSV is filtered against this exact {TOTAL}-species list by scientific name, so
                 rare vagrants and invasives you've recorded are noted but don't push the percentage above 100.
               </p>
-              <div className="rule-dashed my-4" />
+              <div className="border-t rule my-4" />
               <p className="text-xs ink-faint">
                 Sources:<br />
                 <span className="font-mono">aba.org/aba-checklist</span><br />
@@ -1595,8 +1607,8 @@ export default function BirdLifeTracker() {
       )}
 
       {!hydrated && (
-        <div className="fixed inset-0 flex items-center justify-center" style={{ background: '#f3ead8' }}>
-          <div className="font-mono text-xs ink-faint tracking-widest animate-pulse">opening field log…</div>
+        <div className="fixed inset-0 flex items-center justify-center" style={{ background: '#0c1f1f' }}>
+          <div className="font-mono text-xs ink-faint tracking-widest animate-pulse">loading…</div>
         </div>
       )}
     </div>
@@ -1639,27 +1651,25 @@ function SpeciesListDrawer({ seenSci, onClose }) {
   const seenCount = seenSci.size;
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center p-2 sm:p-4 bg-[rgba(20,15,5,0.5)]" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex items-center justify-center p-2 sm:p-4" style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }} onClick={onClose}>
       <div
-        className="max-w-2xl w-full relative flex flex-col"
-        style={{ background: '#f3ead8', boxShadow: '0 30px 80px rgba(0,0,0,0.3)', maxHeight: '92vh' }}
+        className="max-w-2xl w-full relative flex flex-col rounded-2xl overflow-hidden"
+        style={{ background: '#142926', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 30px 80px rgba(0,0,0,0.5)', maxHeight: '92vh' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="grain absolute inset-0 pointer-events-none" />
-
         {/* header */}
-        <div className="relative p-6 sm:p-8 pb-4 border-b rule">
-          <button onClick={onClose} className="absolute top-4 right-4 ink-soft hover:ink z-10">
+        <div className="relative p-6 sm:p-7 pb-4 border-b rule">
+          <button onClick={onClose} className="absolute top-4 right-4 ink-soft hover:ink z-10 transition-colors">
             <X size={18} />
           </button>
           <div className="font-mono text-[10px] ink-faint tracking-[0.25em] uppercase mb-1">Species Index</div>
-          <h2 className="font-display ink text-2xl sm:text-3xl mb-1">The {TOTAL}</h2>
-          <p className="ink-soft text-sm italic mb-4">
-            <span className="moss font-mono not-italic" style={{ fontVariationSettings: "'wght' 500" }}>{seenCount}</span> recorded
+          <h2 className="font-display ink text-2xl sm:text-3xl mb-1" style={{ fontWeight: 700 }}>The {TOTAL}</h2>
+          <p className="ink-soft text-sm mb-4">
+            <span className="moss font-mono" style={{ fontWeight: 600 }}>{seenCount}</span> recorded
             {' · '}
-            <span className="ink-faint font-mono not-italic">{TOTAL - seenCount}</span> unseen
+            <span className="ink-faint font-mono">{TOTAL - seenCount}</span> unseen
             {' · '}
-            grouped by family, ABA taxonomic order
+            grouped by family
           </p>
 
           {/* filter pills */}
@@ -1672,7 +1682,7 @@ function SpeciesListDrawer({ seenSci, onClose }) {
               <button
                 key={key}
                 onClick={() => setFilter(key)}
-                className={`rounded-full px-3 py-1 text-xs transition ${
+                className={`rounded-full px-3 py-1.5 text-xs transition ${
                   filter === key ? 'btn-ink' : 'btn-ghost'
                 }`}
               >
@@ -1697,7 +1707,7 @@ function SpeciesListDrawer({ seenSci, onClose }) {
         {/* list body */}
         <div className="relative flex-1 overflow-y-auto px-2 sm:px-4 py-2">
           {groups.length === 0 ? (
-            <div className="text-center py-12 ink-faint text-sm italic">
+            <div className="text-center py-12 ink-faint text-sm">
               No matches{query ? ` for "${query}"` : ''}.
             </div>
           ) : (
@@ -1707,25 +1717,26 @@ function SpeciesListDrawer({ seenSci, onClose }) {
                 return (
                   <section key={family} className="mb-1">
                     {/* family subheader */}
-                    <div className="sticky top-0 z-10 px-3 py-2 flex items-baseline justify-between gap-3" style={{ background: 'rgba(243,234,216,0.95)', backdropFilter: 'blur(4px)' }}>
-                      <h3 className="font-display ink text-base sm:text-lg" style={{ fontVariationSettings: "'wght' 500, 'opsz' 36" }}>
+                    <div className="sticky top-0 z-10 px-3 py-2 flex items-baseline justify-between gap-3" style={{ background: 'rgba(20, 41, 38, 0.95)', backdropFilter: 'blur(8px)' }}>
+                      <h3 className="font-display ink text-base sm:text-lg" style={{ fontWeight: 600 }}>
                         {family}
                       </h3>
                       <span
                         className="font-mono text-[11px] ink-soft tracking-wider whitespace-nowrap"
-                        style={{ fontVariationSettings: "'wght' 600" }}
+                        style={{ fontWeight: 600 }}
                       >
                         {famSeen} / {items.length}
                       </span>
                     </div>
-                    <div className="rule-dashed mb-1 mx-3" />
+                    <div className="border-t mx-3 mb-1" style={{ borderColor: 'rgba(255,255,255,0.06)' }} />
                     <ul>
                       {items.map(([common, sci]) => {
                         const seen = seenSci.has(sci);
                         return (
                           <li
                             key={sci}
-                            className="species-row flex items-center gap-3 px-3 py-2 border-b border-[rgba(80,60,30,0.08)]"
+                            className="species-row flex items-center gap-3 px-3 py-2.5 border-b"
+                            style={{ borderColor: 'rgba(255,255,255,0.04)' }}
                           >
                             {seen ? (
                               <CheckSquare size={22} strokeWidth={1.75} className="moss shrink-0" />
@@ -1735,11 +1746,11 @@ function SpeciesListDrawer({ seenSci, onClose }) {
                             <div className="flex-1 min-w-0">
                               <div
                                 className={`text-[15px] leading-tight ${seen ? 'ink' : 'ink-soft'}`}
-                                style={seen ? { fontVariationSettings: "'wght' 600" } : undefined}
+                                style={seen ? { fontWeight: 600 } : undefined}
                               >
                                 {common}
                               </div>
-                              <div className="font-mono text-[10px] ink-faint italic mt-0.5 truncate">{sci}</div>
+                              <div className="font-mono text-[10px] ink-faint mt-0.5 truncate" style={{ fontStyle: 'italic' }}>{sci}</div>
                             </div>
                           </li>
                         );
@@ -1785,18 +1796,18 @@ const PATH = geoPath(PROJECTION);
 // are already in screen pixels.
 const PIXEL_PATH = geoPath();
 
-// Warm sequential color scale: saturated golden yellow → bright peach red.
-// `t` in [0, 1].  Piecewise-linear interpolation through five color stops.
-// Alpha is kept relatively high even at the low end so sparse regions still
-// register clearly against the parchment background.
+// Warm sequential color scale: transparent → bright peach red.
+// `t` in [0, 1]. The lowest stop is fully transparent so the outer fringe of
+// each hotspot fades naturally into the map background instead of stopping at
+// a hard 60%-alpha edge.
 function heatColor(t) {
   t = Math.max(0, Math.min(1, t));
-  // [R, G, B, A] stops
   const stops = [
-    { at: 0.00, c: [253, 218, 100, 0.60] }, // saturated golden yellow
-    { at: 0.25, c: [250, 175,  75, 0.72] }, // warm amber
-    { at: 0.50, c: [245, 140,  65, 0.82] }, // soft orange
-    { at: 0.75, c: [232,  95,  55, 0.88] }, // peach
+    { at: 0.00, c: [253, 218, 100, 0.00] }, // fully transparent fringe
+    { at: 0.20, c: [251, 195,  90, 0.40] }, // golden yellow emerging
+    { at: 0.40, c: [248, 160,  75, 0.66] }, // warm amber
+    { at: 0.60, c: [243, 125,  65, 0.80] }, // soft orange
+    { at: 0.80, c: [232,  90,  55, 0.88] }, // peach
     { at: 1.00, c: [218,  60,  42, 0.92] }, // bright peach red
   ];
   for (let i = 1; i < stops.length; i++) {
@@ -1866,29 +1877,27 @@ function SightingsMapDrawer({ points, onClose }) {
   }, [points]);
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center p-2 sm:p-4 bg-[rgba(20,15,5,0.5)]" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex items-center justify-center p-2 sm:p-4" style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }} onClick={onClose}>
       <div
-        className="max-w-3xl w-full relative flex flex-col"
-        style={{ background: '#f3ead8', boxShadow: '0 30px 80px rgba(0,0,0,0.3)', maxHeight: '92vh' }}
+        className="max-w-3xl w-full relative flex flex-col rounded-2xl overflow-hidden"
+        style={{ background: '#142926', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 30px 80px rgba(0,0,0,0.5)', maxHeight: '92vh' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="grain absolute inset-0 pointer-events-none" />
-
         {/* header */}
-        <div className="relative p-6 sm:p-8 pb-4 border-b rule">
-          <button onClick={onClose} className="absolute top-4 right-4 ink-soft hover:ink z-10">
+        <div className="relative p-6 sm:p-7 pb-4 border-b rule">
+          <button onClick={onClose} className="absolute top-4 right-4 ink-soft hover:ink z-10 transition-colors">
             <X size={18} />
           </button>
           <div className="font-mono text-[10px] ink-faint tracking-[0.25em] uppercase mb-1">Cartography</div>
-          <h2 className="font-display ink text-2xl sm:text-3xl mb-1">Where you've found birds</h2>
-          <p className="ink-soft text-sm italic">
-            <span className="font-mono not-italic" style={{ color: 'rgb(220, 65, 45)', fontVariationSettings: "'wght' 500" }}>
+          <h2 className="font-display ink text-2xl sm:text-3xl mb-1" style={{ fontWeight: 700 }}>Where you've found birds</h2>
+          <p className="ink-soft text-sm">
+            <span className="rust font-mono" style={{ fontWeight: 600 }}>
               {totalLocations.toLocaleString()}
             </span> locations
             {peakDiversity > 0 && (
               <>
                 {' · peak '}
-                <span className="font-mono not-italic ink">{peakDiversity}</span> species at one spot
+                <span className="font-mono ink" style={{ fontWeight: 600 }}>{peakDiversity}</span> species at one spot
               </>
             )}
             <br />
@@ -1899,7 +1908,7 @@ function SightingsMapDrawer({ points, onClose }) {
         {/* map body */}
         <div className="relative flex-1 overflow-auto p-2 sm:p-4">
           {projectedCount === 0 ? (
-            <div className="text-center py-12 ink-faint text-sm italic">
+            <div className="text-center py-12 ink-faint text-sm">
               No locations with coordinates were found in your CSV.
             </div>
           ) : (
@@ -1916,13 +1925,13 @@ function SightingsMapDrawer({ points, onClose }) {
                   </clipPath>
                 </defs>
 
-                {/* State fills — subtle so parchment shows through */}
+                {/* State fills — subtle white overlay on dark */}
                 <g>
                   {STATES.features.map((s) => (
                     <path
                       key={s.id}
                       d={PATH(s) || ''}
-                      fill="rgba(80,60,30,0.04)"
+                      fill="rgba(255,255,255,0.03)"
                       stroke="none"
                     />
                   ))}
@@ -1940,11 +1949,11 @@ function SightingsMapDrawer({ points, onClose }) {
                   ))}
                 </g>
 
-                {/* Internal state borders on top of heatmap so states stay legible */}
+                {/* Internal state borders on top of heatmap */}
                 <path
                   d={PATH(STATE_BORDERS) || ''}
                   fill="none"
-                  stroke="rgba(80,60,30,0.35)"
+                  stroke="rgba(255,255,255,0.18)"
                   strokeWidth={0.5}
                   strokeLinejoin="round"
                 />
@@ -1953,7 +1962,7 @@ function SightingsMapDrawer({ points, onClose }) {
                 <path
                   d={PATH(NATION_BORDER) || ''}
                   fill="none"
-                  stroke="rgba(80,60,30,0.55)"
+                  stroke="rgba(255,255,255,0.35)"
                   strokeWidth={0.9}
                   strokeLinejoin="round"
                 />
@@ -1971,7 +1980,7 @@ function SightingsMapDrawer({ points, onClose }) {
                       })}
                     </linearGradient>
                   </defs>
-                  <rect x="0" y="0" width="160" height="12" fill="url(#legend-grad)" stroke="rgba(80,60,30,0.30)" strokeWidth="0.5" />
+                  <rect x="0" y="0" width="160" height="12" fill="url(#legend-grad)" stroke="rgba(255,255,255,0.15)" strokeWidth="0.5" rx="2" />
                 </svg>
                 <span className="font-mono text-[10px] ink-faint tracking-widest uppercase">Many species</span>
               </div>
