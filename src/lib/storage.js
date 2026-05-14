@@ -59,4 +59,22 @@ export const storage = {
   async del(key) {
     await tx('readwrite', (store) => store.delete(key));
   },
+
+  // List keys, optionally filtered by prefix. Mirrors the artifact storage API.
+  async list(prefix) {
+    return new Promise((resolve, reject) => {
+      openDb().then((db) => {
+        const t = db.transaction(STORE, 'readonly');
+        const req = t.objectStore(STORE).getAllKeys();
+        req.onsuccess = () => {
+          const allKeys = req.result || [];
+          const keys = prefix
+            ? allKeys.filter((k) => typeof k === 'string' && k.startsWith(prefix))
+            : allKeys;
+          resolve({ keys });
+        };
+        req.onerror = () => reject(req.error);
+      }).catch(reject);
+    });
+  },
 };

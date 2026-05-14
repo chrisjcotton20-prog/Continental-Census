@@ -1013,7 +1013,49 @@ const STORAGE = {
   csvMeta: 'ebird:csvMeta',
   seenSci: 'ebird:seenSci',
   points: 'ebird:points',
+  locations: 'ebird:locations',
+  apiKey: 'ebird:apiKey',
+  // Cached eBird API responses live under 'ebird:hotspot:{locId}'
 };
+
+// ---------- eBird API client ----------
+// Public docs: https://documenter.getpostman.com/view/664302/S1ENwy59
+// Auth: send the user's API key as the X-eBirdApiToken header.
+// All endpoints are GET, JSON responses.
+const EBIRD_BASE = 'https://api.ebird.org/v2';
+const HOTSPOT_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+async function ebirdFetch(path, apiKey) {
+  const res = await fetch(`${EBIRD_BASE}${path}`, {
+    headers: { 'X-eBirdApiToken': apiKey },
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`eBird ${res.status}${txt ? ': ' + txt.slice(0, 120) : ''}`);
+  }
+  return res.json();
+}
+
+// "Recent observations at a hotspot, last N days" — returns observations with
+// scientific names already populated. Good for surfacing "actually findable
+// now" species. The `back` param maxes out at 30 days on the public API.
+async function fetchRecentAtLocation(locId, apiKey, back = 30) {
+  return ebirdFetch(
+    `/data/obs/${locId}/recent?back=${back}&maxResults=10000&includeProvisional=false`,
+    apiKey,
+  );
+}
+
+// Lightweight per-hotspot cache (IndexedDB via the existing storage helper)
+async function getCachedHotspot(locId) {
+  const v = await storage.get(`ebird:hotspot:${locId}`);
+  if (!v || !v.timestamp || !v.data) return null;
+  if (Date.now() - v.timestamp > HOTSPOT_TTL_MS) return null;
+  return v.data;
+}
+async function setCachedHotspot(locId, data) {
+  await storage.set(`ebird:hotspot:${locId}`, { timestamp: Date.now(), data });
+}
 
 // ---------- CSV parsing ----------
 function parseEBirdCsv(file) {
@@ -1032,6 +1074,7 @@ function parseEBirdCsv(file) {
           const latKey = ['Latitude'].find(k => k in sample) || 'Latitude';
           const lngKey = ['Longitude'].find(k => k in sample) || 'Longitude';
           const locIdKey = ['Location ID'].find(k => k in sample) || 'Location ID';
+          const locNameKey = ['Location'].find(k => k in sample) || 'Location';
 
           const usRows = rows.filter(r => {
             const s = r[stateKey];
@@ -1050,7 +1093,9 @@ function parseEBirdCsv(file) {
 
           const allSpecies = new Set();
           const nativeSci = new Set();
-          // Group countable observations by location: locId -> { lng, lat, species: Set }
+          // Group countable observations by location.
+          // `locations` keeps full data needed for both the heatmap (lng/lat/weight)
+          // AND the tips feature (id/name/native species list).
           const locations = new Map();
           let earliest = null, latest = null;
           let totalObservations = 0;
@@ -1073,10 +1118,19 @@ function parseEBirdCsv(file) {
                               `${lng.toFixed(5)},${lat.toFixed(5)}`;
                 let loc = locations.get(locId);
                 if (!loc) {
-                  loc = { lng, lat, species: new Set() };
+                  loc = {
+                    id: locId,
+                    name: (r[locNameKey] && String(r[locNameKey]).trim()) || null,
+                    lng, lat,
+                    species: new Set(),
+                    nativeSpecies: new Set(),
+                  };
                   locations.set(locId, loc);
                 }
                 loc.species.add(speciesKey);
+                if (sci && NATIVE_SCI.has(sci)) {
+                  loc.nativeSpecies.add(sci);
+                }
               }
             }
             const dStr = r[dateKey];
@@ -1089,10 +1143,24 @@ function parseEBirdCsv(file) {
             }
           }
 
-          // Output: one tuple per unique location, [lng, lat, uniqueSpeciesCount]
+          // Outputs:
+          //   points     — [[lng, lat, speciesCount], ...] for the heatmap
+          //   locations  — [{id, name, lng, lat, species, nativeSpecies}, ...] for tips
           const points = [];
+          const locationsArr = [];
           for (const loc of locations.values()) {
             points.push([loc.lng, loc.lat, loc.species.size]);
+            // Only locations with a real eBird Location ID can be queried via the API.
+            // Coordinate-key locations are kept out of the tips dataset.
+            if (loc.id && loc.id.startsWith('L')) {
+              locationsArr.push({
+                id: loc.id,
+                name: loc.name,
+                lng: loc.lng,
+                lat: loc.lat,
+                species: Array.from(loc.nativeSpecies),
+              });
+            }
           }
 
           resolve({
@@ -1100,6 +1168,7 @@ function parseEBirdCsv(file) {
             allCount: allSpecies.size,
             seenSci: Array.from(nativeSci),
             points,
+            locations: locationsArr,
             meta: {
               observations: totalObservations,
               earliest: earliest ? earliest.toISOString() : null,
@@ -1108,6 +1177,7 @@ function parseEBirdCsv(file) {
               updatedAt: new Date().toISOString(),
               allCount: allSpecies.size,
               locationCount: points.length,
+              ebirdLocations: locationsArr.length,
             },
           });
         } catch (e) {
@@ -1145,7 +1215,10 @@ export default function BirdLifeTracker() {
   const [userCount, setUserCount] = useState(null);
   const [csvMeta, setCsvMeta] = useState(null);
   const [seenSci, setSeenSci] = useState(() => new Set());
-  const [points, setPoints] = useState(null); // array of [lng, lat]
+  const [points, setPoints] = useState(null); // [[lng, lat, w], ...] for heatmap
+  const [locations, setLocations] = useState(null); // [{id, name, lng, lat, species}] for tips
+  const [apiKey, setApiKey] = useState(null);
+  const [showTips, setShowTips] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -1248,16 +1321,20 @@ export default function BirdLifeTracker() {
   // hydrate from storage
   useEffect(() => {
     (async () => {
-      const [u, m, s, p] = await Promise.all([
+      const [u, m, s, p, l, k] = await Promise.all([
         storage.get(STORAGE.userCount),
         storage.get(STORAGE.csvMeta),
         storage.get(STORAGE.seenSci),
         storage.get(STORAGE.points),
+        storage.get(STORAGE.locations),
+        storage.get(STORAGE.apiKey),
       ]);
       if (u) setUserCount(parseInt(u, 10));
       if (m) { try { setCsvMeta(JSON.parse(m)); } catch {} }
       if (s) { try { setSeenSci(new Set(JSON.parse(s))); } catch {} }
       if (p) { try { setPoints(JSON.parse(p)); } catch {} }
+      if (l) { try { setLocations(JSON.parse(l)); } catch {} }
+      if (k) setApiKey(k);
       setHydrated(true);
     })();
   }, []);
@@ -1316,16 +1393,18 @@ export default function BirdLifeTracker() {
     setLoading(true);
     setError(null);
     try {
-      const { count, allCount, seenSci: nextSeen, points: nextPoints, meta } = await parseEBirdCsv(file);
+      const { count, allCount, seenSci: nextSeen, points: nextPoints, locations: nextLocations, meta } = await parseEBirdCsv(file);
       const seenSet = new Set(nextSeen);
       setUserCount(count);
       setCsvMeta(meta);
       setSeenSci(seenSet);
       setPoints(nextPoints);
+      setLocations(nextLocations);
       await storage.set(STORAGE.userCount, String(count));
       await storage.set(STORAGE.csvMeta, JSON.stringify(meta));
       await storage.set(STORAGE.seenSci, JSON.stringify(nextSeen));
       await storage.set(STORAGE.points, JSON.stringify(nextPoints));
+      await storage.set(STORAGE.locations, JSON.stringify(nextLocations));
       const extra = allCount - count;
       const extraNote = extra > 0 ? ` (${extra} non-native or rare visitor${extra === 1 ? '' : 's'} excluded)` : '';
       setSuccess(`Counted ${count.toLocaleString()} of ${TOTAL} native species${extraNote}.`);
@@ -1336,18 +1415,40 @@ export default function BirdLifeTracker() {
     }
   }
 
+  async function saveApiKey(value) {
+    const trimmed = (value || '').trim();
+    if (trimmed) {
+      await storage.set(STORAGE.apiKey, trimmed);
+      setApiKey(trimmed);
+    } else {
+      await storage.del(STORAGE.apiKey);
+      setApiKey(null);
+    }
+  }
+
   async function resetAll() {
-    if (!confirm('Clear stored data (count, sightings, CSV summary, map)?')) return;
+    if (!confirm('Clear stored data (count, sightings, CSV summary, map, cached tips)? Your eBird API key is kept.')) return;
+    // Clear bird/location data
     await Promise.all([
       storage.del(STORAGE.userCount),
       storage.del(STORAGE.csvMeta),
       storage.del(STORAGE.seenSci),
       storage.del(STORAGE.points),
+      storage.del(STORAGE.locations),
     ]);
+    // Also flush cached per-hotspot eBird responses
+    try {
+      const keys = await storage.list('ebird:hotspot:');
+      const list = keys?.keys || [];
+      await Promise.all(list.map((k) => storage.del(k)));
+    } catch {
+      // list() may not be supported by older storage; non-fatal
+    }
     setUserCount(null);
     setCsvMeta(null);
     setSeenSci(new Set());
     setPoints(null);
+    setLocations(null);
     setSuccess('Cleared.');
   }
 
@@ -1609,6 +1710,15 @@ export default function BirdLifeTracker() {
                   Sightings map
                 </button>
               )}
+              {locations && locations.length > 0 && (
+                <button
+                  onClick={() => setShowTips(true)}
+                  className="btn-ink rounded-full px-5 py-2.5 text-sm inline-flex items-center gap-2"
+                >
+                  <Search size={14} strokeWidth={2} />
+                  Find missed birds
+                </button>
+              )}
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-10 anim-5">
@@ -1759,6 +1869,17 @@ export default function BirdLifeTracker() {
       {/* sightings map drawer */}
       {showMap && <SightingsMapDrawer points={points || []} userCount={userCount} onClose={() => setShowMap(false)} />}
 
+      {/* tips drawer — eBird API hints for missed species at visited hotspots */}
+      {showTips && (
+        <TipsDrawer
+          apiKey={apiKey}
+          locations={locations}
+          seenSci={seenSci}
+          onClose={() => setShowTips(false)}
+          onOpenSettings={() => { setShowTips(false); setShowSettings(true); }}
+        />
+      )}
+
       {/* install prompt drawer (manual instructions for iOS / browsers without programmatic install) */}
       {showInstall && <InstallPromptDrawer onClose={() => setShowInstall(false)} />}
 
@@ -1793,6 +1914,41 @@ export default function BirdLifeTracker() {
 
             <div className="border-t rule my-6" />
 
+            <label className="block mb-6">
+              <span className="font-mono text-[10px] ink-faint tracking-widest uppercase block mb-2 flex items-center justify-between">
+                <span>eBird API key</span>
+                {apiKey && (
+                  <span className="moss font-mono text-[10px]" style={{ fontWeight: 600 }}>● Connected</span>
+                )}
+              </span>
+              <input
+                type="text"
+                defaultValue={apiKey || ''}
+                onBlur={(e) => saveApiKey(e.target.value)}
+                placeholder="optional · enables missed-bird tips"
+                className="input-field rounded-lg px-3 py-2 text-sm w-full font-mono"
+                autoComplete="off"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+              />
+              <span className="text-xs ink-faint mt-2 block leading-relaxed">
+                Get a free key at{' '}
+                <a href="https://ebird.org/api/keygen" target="_blank" rel="noopener noreferrer" className="rust underline">
+                  ebird.org/api/keygen
+                </a>{' '}
+                · stored locally on this device only · used to fetch recent observations at your hotspots
+                {apiKey && (
+                  <>
+                    <br />
+                    <button onClick={() => saveApiKey('')} className="rust underline mt-1">Clear key</button>
+                  </>
+                )}
+              </span>
+            </label>
+
+            <div className="border-t rule my-6" />
+
             <div className="space-y-1">
               <button
                 onClick={() => { openAllSpecies(); setShowSettings(false); }}
@@ -1806,6 +1962,14 @@ export default function BirdLifeTracker() {
                   className="block w-full text-left px-3 py-2 rounded-lg ink-soft hover:ink hover:bg-white/5 text-sm transition-colors"
                 >
                   Sightings map →
+                </button>
+              )}
+              {locations && locations.length > 0 && (
+                <button
+                  onClick={() => { setShowTips(true); setShowSettings(false); }}
+                  className="block w-full text-left px-3 py-2 rounded-lg ink-soft hover:ink hover:bg-white/5 text-sm transition-colors"
+                >
+                  Find missed birds →
                 </button>
               )}
               <button
@@ -2250,6 +2414,323 @@ function FamiliesDrawer({ seenSci, onClose, onFamilyClick }) {
           <span className="font-mono text-[10px] ink-faint tracking-wider uppercase">
             {visible.length} of {totalFamilies} families shown
           </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ============================================================================
+// Tips drawer — fetches eBird's recent observations at the user's visited
+// hotspots, then surfaces native species they've never seen elsewhere. Each
+// hotspot's response is cached for 30 days, so repeat opens are instant.
+// ============================================================================
+function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
+  const [tips, setTips] = useState(null); // null=not loaded, []=empty result, [...]=results
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [cacheTimestamp, setCacheTimestamp] = useState(null);
+
+  // Filter to locations the user has actually birded at (5+ native species).
+  // This trims out drive-by checklists and keeps focus on their "patches".
+  const targetLocations = useMemo(() => {
+    if (!locations) return [];
+    return locations
+      .filter((l) => l.id && l.id.startsWith('L') && (l.species?.length || 0) >= 5)
+      .sort((a, b) => (b.species?.length || 0) - (a.species?.length || 0));
+  }, [locations]);
+
+  // Compute tips from a list of (location, recentObs) pairs.
+  function computeTips(pairs) {
+    // Each "tip" is one missed species at one location with its most-recent date.
+    // We keep the freshest observation per (species, location) combo, then sort
+    // globally by date so the headline tips are about species reported THIS WEEK.
+    const tipsByKey = new Map();
+    for (const { loc, obs } of pairs) {
+      for (const o of obs) {
+        const sci = o.sciName;
+        if (!sci || !NATIVE_SCI.has(sci)) continue;
+        if (seenSci.has(sci)) continue;
+        const key = `${sci}|${loc.id}`;
+        const prev = tipsByKey.get(key);
+        if (!prev || o.obsDt > prev.obsDt) {
+          tipsByKey.set(key, {
+            sci,
+            common: o.comName || sci,
+            locId: loc.id,
+            locName: loc.name || loc.id,
+            obsDt: o.obsDt,
+            howMany: o.howMany ?? null,
+          });
+        }
+      }
+    }
+    const arr = Array.from(tipsByKey.values());
+    arr.sort((a, b) => b.obsDt.localeCompare(a.obsDt));
+    return arr;
+  }
+
+  // On first open, try to assemble tips from any cached hotspot data.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!targetLocations.length) {
+        setTips([]);
+        return;
+      }
+      const pairs = [];
+      let oldestTs = null;
+      for (const loc of targetLocations) {
+        const cached = await getCachedHotspot(loc.id);
+        if (cached) {
+          pairs.push({ loc, obs: cached });
+        }
+        // Track the cache age so we can show "as of N days ago"
+        const raw = await storage.get(`ebird:hotspot:${loc.id}`);
+        if (raw?.timestamp && (!oldestTs || raw.timestamp < oldestTs)) {
+          oldestTs = raw.timestamp;
+        }
+      }
+      if (cancelled) return;
+      if (pairs.length > 0) {
+        setTips(computeTips(pairs));
+        setCacheTimestamp(oldestTs);
+      } else {
+        setTips(null); // signal "not fetched yet"
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [targetLocations.length]);
+
+  async function fetchAll(forceRefresh = false) {
+    if (!apiKey) {
+      setError('Add your eBird API key in Settings first.');
+      return;
+    }
+    if (!targetLocations.length) return;
+
+    setLoading(true);
+    setError(null);
+    setProgress({ done: 0, total: targetLocations.length });
+
+    try {
+      const pairs = [];
+      for (let i = 0; i < targetLocations.length; i++) {
+        const loc = targetLocations[i];
+        // Use cache when not forcing
+        let obs = forceRefresh ? null : await getCachedHotspot(loc.id);
+        if (!obs) {
+          try {
+            obs = await fetchRecentAtLocation(loc.id, apiKey, 30);
+            await setCachedHotspot(loc.id, obs);
+          } catch (e) {
+            // Skip this location; keep going
+            console.warn('fetch failed for', loc.id, e);
+            obs = [];
+          }
+        }
+        pairs.push({ loc, obs });
+        setProgress({ done: i + 1, total: targetLocations.length });
+        // Be polite to the API — short pause between calls
+        await new Promise((r) => setTimeout(r, 80));
+      }
+      setTips(computeTips(pairs));
+      setCacheTimestamp(Date.now());
+    } catch (e) {
+      setError(e.message || 'Fetch failed');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Helpers for date display
+  function relDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d)) return iso;
+    const diff = Date.now() - d.getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    if (days <= 0) return 'today';
+    if (days === 1) return 'yesterday';
+    if (days < 7) return `${days} days ago`;
+    if (days < 30) return `${Math.floor(days / 7)} wk ago`;
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  const hasApiKey = !!apiKey;
+  const hasLocations = targetLocations.length > 0;
+  const shownTips = (tips || []).slice(0, 40);
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center p-2 sm:p-4" style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }} onClick={onClose}>
+      <div
+        className="max-w-2xl w-full relative flex flex-col rounded-2xl overflow-hidden"
+        style={{ background: '#142926', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 30px 80px rgba(0,0,0,0.5)', maxHeight: '92vh' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* header */}
+        <div className="relative p-6 sm:p-7 pb-4 border-b rule">
+          <button onClick={onClose} className="absolute top-4 right-4 ink-soft hover:ink z-10 transition-colors">
+            <X size={18} />
+          </button>
+          <div className="font-mono text-[10px] ink-faint tracking-[0.25em] uppercase mb-1">Hints</div>
+          <h2 className="font-display ink text-2xl sm:text-3xl mb-1" style={{ fontWeight: 700 }}>Birds you've missed</h2>
+          <p className="ink-soft text-sm">
+            Recently reported at your eBird hotspots — but not yet on your life list
+          </p>
+        </div>
+
+        {/* body */}
+        <div className="relative flex-1 overflow-y-auto px-4 sm:px-6 py-4">
+          {/* No locations available */}
+          {!hasLocations && (
+            <div className="text-center py-12">
+              <div className="ink-soft text-sm mb-3">
+                No eBird hotspots in your data yet.
+              </div>
+              <div className="text-xs ink-faint max-w-xs mx-auto">
+                Upload a CSV from <span className="font-mono">My eBird → Download My Data</span>. Tips
+                use the Location IDs in your checklist data.
+              </div>
+            </div>
+          )}
+
+          {/* No API key */}
+          {hasLocations && !hasApiKey && (
+            <div className="surface-1 rounded-2xl p-5 mb-3">
+              <div className="font-mono text-[10px] ink-faint tracking-widest uppercase mb-2">Step 1</div>
+              <h3 className="font-display ink text-lg mb-2" style={{ fontWeight: 600 }}>Connect your eBird API key</h3>
+              <p className="text-sm ink-soft leading-relaxed mb-3">
+                Tips use eBird's public API to see what's been spotted at your {targetLocations.length} regular hotspots.
+                The key is free, takes a minute, and is stored only on this device.
+              </p>
+              <div className="text-xs ink-faint mb-3">
+                Go to <a href="https://ebird.org/api/keygen" target="_blank" rel="noopener noreferrer" className="rust underline">ebird.org/api/keygen</a>,
+                paste the key into Settings.
+              </div>
+              <button
+                onClick={() => { onOpenSettings(); }}
+                className="btn-ink rounded-full px-5 py-2 text-sm inline-flex items-center gap-2"
+              >
+                <Settings size={14} />
+                Open Settings
+              </button>
+            </div>
+          )}
+
+          {/* Have key, nothing fetched yet */}
+          {hasLocations && hasApiKey && tips === null && !loading && (
+            <div className="surface-1 rounded-2xl p-5 mb-3 text-center">
+              <h3 className="font-display ink text-lg mb-2" style={{ fontWeight: 600 }}>Ready to scan</h3>
+              <p className="text-sm ink-soft leading-relaxed mb-4">
+                We'll check the last 30 days of reports at your {targetLocations.length} most-birded hotspots.
+                Takes about {Math.ceil(targetLocations.length * 0.15)} seconds.
+              </p>
+              <button
+                onClick={() => fetchAll(false)}
+                className="btn-ink rounded-full px-5 py-2.5 text-sm inline-flex items-center gap-2"
+              >
+                <RefreshCw size={14} />
+                Find missed birds
+              </button>
+            </div>
+          )}
+
+          {/* Loading */}
+          {loading && (
+            <div className="surface-1 rounded-2xl p-5 mb-3">
+              <div className="flex items-center gap-3 mb-3">
+                <RefreshCw size={16} className="rust animate-spin" />
+                <span className="font-display ink text-sm" style={{ fontWeight: 600 }}>
+                  Checking your hotspots…
+                </span>
+              </div>
+              <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                <div
+                  className="h-full rounded-full transition-all duration-300"
+                  style={{
+                    width: progress.total ? `${(progress.done / progress.total) * 100}%` : '0%',
+                    background: 'linear-gradient(90deg, #f97316 0%, #fb923c 100%)',
+                  }}
+                />
+              </div>
+              <div className="font-mono text-[10px] ink-faint tracking-wider mt-2">
+                {progress.done} / {progress.total} hotspots
+              </div>
+            </div>
+          )}
+
+          {/* Error */}
+          {error && (
+            <div className="rounded-2xl p-4 mb-3 text-sm" style={{
+              background: 'rgba(127, 29, 29, 0.30)',
+              border: '1px solid rgba(248, 113, 113, 0.25)',
+              color: '#fda4af',
+            }}>
+              {error}
+            </div>
+          )}
+
+          {/* Empty result */}
+          {tips !== null && shownTips.length === 0 && !loading && (
+            <div className="text-center py-8 ink-faint text-sm">
+              No missed birds in the last 30 days. Either you've seen them all,
+              or your spots are quiet right now.
+            </div>
+          )}
+
+          {/* Tips list */}
+          {shownTips.length > 0 && (
+            <>
+              {cacheTimestamp && (
+                <div className="flex items-center justify-between mb-3 px-1">
+                  <span className="font-mono text-[10px] ink-faint tracking-wider uppercase">
+                    {shownTips.length} hint{shownTips.length === 1 ? '' : 's'} · as of {relDate(new Date(cacheTimestamp).toISOString())}
+                  </span>
+                  <button
+                    onClick={() => fetchAll(true)}
+                    disabled={loading}
+                    className="btn-ghost rounded-full px-3 py-1 text-[11px] inline-flex items-center gap-1.5"
+                  >
+                    <RefreshCw size={11} className={loading ? 'animate-spin' : ''} />
+                    Refresh
+                  </button>
+                </div>
+              )}
+              <ul>
+                {shownTips.map((t) => (
+                  <li
+                    key={`${t.sci}-${t.locId}`}
+                    className="species-row flex items-start gap-3 px-3 py-3 border-b"
+                    style={{ borderColor: 'rgba(255,255,255,0.04)' }}
+                  >
+                    <div className="w-2 h-2 mt-2 rounded-full shrink-0" style={{ background: '#fb923c', boxShadow: '0 0 8px rgba(249,115,22,0.6)' }} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[15px] ink leading-tight" style={{ fontWeight: 600 }}>{t.common}</div>
+                      <div className="font-mono text-[10px] ink-faint mt-0.5 truncate" style={{ fontStyle: 'italic' }}>{t.sci}</div>
+                      <div className="text-xs ink-soft mt-1">
+                        <span className="rust" style={{ fontWeight: 500 }}>{relDate(t.obsDt)}</span>
+                        <span className="ink-faint"> · </span>
+                        {t.locName}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+
+        {/* footer */}
+        <div className="relative px-4 sm:px-6 py-3 border-t rule flex items-center justify-between gap-3">
+          <span className="font-mono text-[10px] ink-faint tracking-wider uppercase">
+            {targetLocations.length} hotspot{targetLocations.length === 1 ? '' : 's'} scanned
+          </span>
+          <button onClick={onClose} className="btn-ghost rounded-full px-4 py-1.5 text-xs">
+            Close
+          </button>
         </div>
       </div>
     </div>
