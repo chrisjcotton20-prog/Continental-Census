@@ -1046,14 +1046,14 @@ async function fetchRecentAtLocation(locId, apiKey, back = 30) {
   );
 }
 
-// All recent observations of ONE species at ONE hotspot. Unlike the call above
-// (which dedupes to one entry per species), this returns every individual
-// sighting. We use it to verify a candidate species has been reported more than
-// once — proxying "the bird has been hanging around" rather than a one-shot
-// flyby. Critical to the "no vagrants in tips" filter.
-async function fetchSpeciesAtLocation(locId, speciesCode, apiKey, back = 30) {
+// All observations at a hotspot on a specific date. Unlike the various "recent"
+// endpoints (which dedupe to one entry per species per location), historic
+// returns every individual observation submitted on that date — so we can
+// actually count how many distinct people reported a given bird. This is the
+// endpoint that powers the "≥ 2 separate observers" verification.
+async function fetchHistoricAtLocation(locId, year, month, day, apiKey) {
   return ebirdFetch(
-    `/data/obs/${locId}/recent/${speciesCode}?back=${back}&maxResults=200&includeProvisional=false`,
+    `/data/obs/${locId}/historic/${year}/${month}/${day}?maxResults=10000&includeProvisional=false`,
     apiKey,
   );
 }
@@ -1069,18 +1069,18 @@ async function setCachedHotspot(locId, data) {
   await storage.set(`ebird:hotspot:${locId}`, { timestamp: Date.now(), data });
 }
 
-// Per-(hotspot, species) cache. Shorter TTL than hotspot cache because the
-// "is the bird still there" question is more time-sensitive than "what's the
-// general species composition of this place."
-const SPECIES_TTL_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
-async function getCachedSpecies(locId, speciesCode) {
-  const v = await storage.get(`ebird:species:${locId}:${speciesCode}`);
+// Per-(hotspot, day) cache for historic observations. 24h TTL — short enough
+// that "today" stays reasonably fresh, long enough that scrolling through
+// recent days is instant. Older days are essentially frozen anyway.
+const HISTORIC_TTL_MS = 24 * 60 * 60 * 1000;
+async function getCachedHistoric(locId, dateStr) {
+  const v = await storage.get(`ebird:hist:${locId}:${dateStr}`);
   if (!v || !v.timestamp) return null;
-  if (Date.now() - v.timestamp > SPECIES_TTL_MS) return null;
+  if (Date.now() - v.timestamp > HISTORIC_TTL_MS) return null;
   return v.data || [];
 }
-async function setCachedSpecies(locId, speciesCode, data) {
-  await storage.set(`ebird:species:${locId}:${speciesCode}`, {
+async function setCachedHistoric(locId, dateStr, data) {
+  await storage.set(`ebird:hist:${locId}:${dateStr}`, {
     timestamp: Date.now(),
     data: data || [],
   });
@@ -1465,13 +1465,18 @@ export default function BirdLifeTracker() {
       storage.del(STORAGE.points),
       storage.del(STORAGE.locations),
     ]);
-    // Also flush cached per-hotspot and per-species eBird responses
+    // Also flush cached per-hotspot, per-species, and historic-day eBird data
     try {
-      const [hotspotKeys, speciesKeys] = await Promise.all([
+      const [hotspotKeys, speciesKeys, histKeys] = await Promise.all([
         storage.list('ebird:hotspot:'),
         storage.list('ebird:species:'),
+        storage.list('ebird:hist:'),
       ]);
-      const all = [...(hotspotKeys?.keys || []), ...(speciesKeys?.keys || [])];
+      const all = [
+        ...(hotspotKeys?.keys || []),
+        ...(speciesKeys?.keys || []),
+        ...(histKeys?.keys || []),
+      ];
       await Promise.all(all.map((k) => storage.del(k)));
     } catch {
       // list() may not be supported by older storage; non-fatal
@@ -2483,9 +2488,9 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
       .sort((a, b) => (b.species?.length || 0) - (a.species?.length || 0));
   }, [locations]);
 
-  // On first open, assemble tips from any cached data (both hotspot recents
-  // and per-species verifications). Anything not in cache will simply be
-  // missing from results — the user fetches to fill it in.
+  // On first open, assemble tips from any cached historic-day data. Anything
+  // not in cache is simply absent from the result — the user fetches to fill
+  // it in. This makes drawer reopens instant when the cache is warm.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -2493,69 +2498,83 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
         setTips([]);
         return;
       }
-      // Pass 1: pull cached hotspot recents and collect candidates
-      const candidates = [];
+      const dates = lastNDays(7);
+      const observersByKey = new Map();
+      let cachedAny = false;
       let oldestTs = null;
+
       for (const loc of targetLocations) {
-        const cached = await getCachedHotspot(loc.id);
-        if (!cached) continue;
-        const raw = await storage.get(`ebird:hotspot:${loc.id}`);
-        if (raw?.timestamp && (!oldestTs || raw.timestamp < oldestTs)) {
-          oldestTs = raw.timestamp;
-        }
-        for (const o of cached) {
-          if (!o.sciName || !NATIVE_SCI.has(o.sciName)) continue;
-          if (seenSci.has(o.sciName)) continue;
-          if (!o.speciesCode) continue;
-          candidates.push({
-            locId: loc.id,
-            locName: loc.name || loc.id,
-            speciesCode: o.speciesCode,
-            sciName: o.sciName,
-            comName: o.comName || o.sciName,
-          });
+        for (const date of dates) {
+          const raw = await storage.get(`ebird:hist:${loc.id}:${date.dateStr}`);
+          if (!raw || !raw.timestamp) continue;
+          if (Date.now() - raw.timestamp > HISTORIC_TTL_MS) continue;
+          cachedAny = true;
+          if (!oldestTs || raw.timestamp < oldestTs) oldestTs = raw.timestamp;
+          for (const o of (raw.data || [])) {
+            aggregateObservation(loc, o, observersByKey);
+          }
         }
       }
       if (cancelled) return;
 
-      if (candidates.length === 0) {
+      if (!cachedAny) {
         setTips(null); // signal "not fetched yet"
         return;
       }
 
-      // Pass 2: read cached species observations and filter to verified
       const verified = [];
-      for (const c of candidates) {
-        const obs = await getCachedSpecies(c.locId, c.speciesCode);
-        if (!obs) continue; // not yet verified — wait for full scan
-        const observers = new Set();
-        for (const o of obs) {
-          const key = o.userDisplayName
-            ? `n:${o.userDisplayName}`
-            : (o.subId ? `s:${o.subId}` : null);
-          if (key) observers.add(key);
-        }
-        if (observers.size >= 2 && obs[0]?.obsDt) {
-          verified.push({
-            ...c,
-            observers,
-            mostRecent: obs[0].obsDt,
-          });
-        }
+      for (const entry of observersByKey.values()) {
+        if (entry.observers.size >= 2) verified.push(entry);
       }
-      if (cancelled) return;
-
-      if (verified.length > 0) {
-        setTips(buildTipsFromVerified(verified));
-        setCacheTimestamp(oldestTs);
-      } else {
-        // Hotspot caches exist but no species verifications yet — treat as
-        // "needs fetching" so the Ready-to-scan card shows.
-        setTips(null);
-      }
+      setTips(buildTipsFromVerified(verified));
+      setCacheTimestamp(oldestTs);
     })();
     return () => { cancelled = true; };
   }, [targetLocations.length]);
+
+  // Builds a list of the last N days as {year, month, day, dateStr} objects.
+  function lastNDays(n) {
+    const out = [];
+    const today = new Date();
+    for (let i = 0; i < n; i++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const y = d.getFullYear();
+      const m = d.getMonth() + 1;
+      const day = d.getDate();
+      const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      out.push({ year: y, month: m, day, dateStr });
+    }
+    return out;
+  }
+
+  // Add a single historic observation record into the (hotspot, species) map.
+  // Pulled out so the on-mount cache load and the fresh fetch path share logic.
+  function aggregateObservation(loc, o, observersByKey) {
+    if (!o.sciName || !NATIVE_SCI.has(o.sciName)) return;
+    if (seenSci.has(o.sciName)) return;
+    const key = `${loc.id}|${o.sciName}`;
+    let entry = observersByKey.get(key);
+    if (!entry) {
+      entry = {
+        sciName: o.sciName,
+        comName: o.comName || o.sciName,
+        observers: new Set(),
+        mostRecent: o.obsDt,
+        locId: loc.id,
+        locName: loc.name || loc.id,
+      };
+      observersByKey.set(key, entry);
+    }
+    // Prefer userDisplayName (the human-readable submitter); fall back to subId
+    // (the unique checklist ID) when the name is suppressed by privacy settings
+    // or missing from older records.
+    const obsKey = o.userDisplayName
+      ? `n:${o.userDisplayName}`
+      : (o.subId ? `s:${o.subId}` : null);
+    if (obsKey) entry.observers.add(obsKey);
+    if (o.obsDt && o.obsDt > entry.mostRecent) entry.mostRecent = o.obsDt;
+  }
 
   async function fetchAll(forceRefresh = false) {
     if (!apiKey) {
@@ -2566,96 +2585,63 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
 
     setLoading(true);
     setError(null);
-    setProgress({ phase: 'scan', done: 0, total: targetLocations.length });
 
     try {
-      // --- Phase 1: hotspot recents -------------------------------------------
-      // Get the species-deduped "what's been seen here lately" for each hotspot.
-      const pairs = [];
-      for (let i = 0; i < targetLocations.length; i++) {
-        const loc = targetLocations[i];
-        let obs = forceRefresh ? null : await getCachedHotspot(loc.id);
-        if (!obs) {
-          try {
-            obs = await fetchRecentAtLocation(loc.id, apiKey, 30);
-            await setCachedHotspot(loc.id, obs);
-          } catch (e) {
-            console.warn('hotspot fetch failed for', loc.id, e);
-            obs = [];
-          }
-        }
-        pairs.push({ loc, obs });
-        setProgress({ phase: 'scan', done: i + 1, total: targetLocations.length });
-        await new Promise((r) => setTimeout(r, 80));
-      }
-
-      // --- Phase 2: enumerate (species, hotspot) candidates -------------------
-      // Anything native that the user hasn't seen anywhere is a candidate. We
-      // still need to verify it's been reported more than once at this hotspot.
-      const candidates = [];
-      for (const { loc, obs } of pairs) {
-        for (const o of obs) {
-          if (!o.sciName || !NATIVE_SCI.has(o.sciName)) continue;
-          if (seenSci.has(o.sciName)) continue;
-          if (!o.speciesCode) continue; // need the code for the verify call
-          candidates.push({
-            locId: loc.id,
-            locName: loc.name || loc.id,
-            speciesCode: o.speciesCode,
-            sciName: o.sciName,
-            comName: o.comName || o.sciName,
-          });
+      // Build the task list: each hotspot × each of the last 7 days. We use
+      // the historic-day endpoint because every other "recent" endpoint dedupes
+      // to one observation per species per location, which makes counting
+      // independent observers impossible. Historic returns every individual
+      // submission for that hotspot on that date — exactly what we need.
+      const DAYS = 7;
+      const dates = lastNDays(DAYS);
+      const tasks = [];
+      for (const loc of targetLocations) {
+        for (const date of dates) {
+          tasks.push({ loc, date });
         }
       }
 
-      // --- Phase 3: verify each candidate has 2+ observations -----------------
-      // We require the species to have been reported on at least two separate
-      // days at the hotspot — that filters out one-day vagrants and lets the
-      // person actually go look for the bird with a reasonable chance.
-      setProgress({ phase: 'verify', done: 0, total: candidates.length });
+      setProgress({ phase: 'verify', done: 0, total: tasks.length });
 
-      const verified = [];
+      const observersByKey = new Map();
       const concurrency = 3;
-      for (let i = 0; i < candidates.length; i += concurrency) {
-        const batch = candidates.slice(i, i + concurrency);
-        const results = await Promise.all(batch.map(async (c) => {
-          let obs = forceRefresh ? null : await getCachedSpecies(c.locId, c.speciesCode);
-          if (!obs) {
+
+      for (let i = 0; i < tasks.length; i += concurrency) {
+        const batch = tasks.slice(i, i + concurrency);
+        const results = await Promise.all(batch.map(async (t) => {
+          let hist = forceRefresh ? null : await getCachedHistoric(t.loc.id, t.date.dateStr);
+          if (!hist) {
             try {
-              obs = await fetchSpeciesAtLocation(c.locId, c.speciesCode, apiKey, 30);
-              await setCachedSpecies(c.locId, c.speciesCode, obs);
+              hist = await fetchHistoricAtLocation(
+                t.loc.id, t.date.year, t.date.month, t.date.day, apiKey
+              );
+              await setCachedHistoric(t.loc.id, t.date.dateStr, hist);
             } catch (e) {
-              console.warn('species fetch failed for', c.locId, c.speciesCode, e);
-              obs = [];
+              console.warn('historic fetch failed for', t.loc.id, t.date.dateStr, e);
+              hist = [];
             }
           }
-          // Count distinct observers. Each eBird record has a `userDisplayName`
-          // for the submitter; some older or privacy-shielded records may not,
-          // so we fall back to the unique checklist id (`subId`) for those.
-          // Two records with the same userDisplayName = the same person, so they
-          // collapse to one — we want INDEPENDENT corroboration, not the same
-          // birder reporting twice.
-          const observers = new Set();
-          for (const o of (obs || [])) {
-            const key = o.userDisplayName
-              ? `n:${o.userDisplayName}`
-              : (o.subId ? `s:${o.subId}` : null);
-            if (key) observers.add(key);
-          }
-          return { ...c, observers, mostRecent: (obs && obs[0]?.obsDt) || null };
+          return { loc: t.loc, hist };
         }));
 
-        for (const r of results) {
-          if (r.observers.size >= 2 && r.mostRecent) {
-            verified.push(r);
+        for (const { loc, hist } of results) {
+          for (const o of hist) {
+            aggregateObservation(loc, o, observersByKey);
           }
         }
+
         setProgress({
           phase: 'verify',
-          done: Math.min(i + concurrency, candidates.length),
-          total: candidates.length,
+          done: Math.min(i + concurrency, tasks.length),
+          total: tasks.length,
         });
         await new Promise((r) => setTimeout(r, 60));
+      }
+
+      // Filter to species seen by 2+ distinct observers at the same hotspot.
+      const verified = [];
+      for (const entry of observersByKey.values()) {
+        if (entry.observers.size >= 2) verified.push(entry);
       }
 
       setTips(buildTipsFromVerified(verified));
@@ -2775,9 +2761,12 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
             <div className="surface-1 rounded-2xl p-5 mb-3 text-center">
               <h3 className="font-display ink text-lg mb-2" style={{ fontWeight: 600 }}>Ready to scan</h3>
               <p className="text-sm ink-soft leading-relaxed mb-4">
-                We'll check the last 30 days at your {targetLocations.length} most-birded hotspots, then
-                verify each missed species has been reported by at least two separate observers —
-                filtering out vagrants and unconfirmed sightings.
+                We'll read the last 7 days of checklist history at your {targetLocations.length} most-birded
+                hotspots and surface any native species reported by 2+ separate observers — filtering out
+                vagrants, one-off sightings, and single-birder reports.
+              </p>
+              <p className="text-xs ink-faint mb-4">
+                ~{Math.ceil((targetLocations.length * 7) / 3 * 0.15)}s on first run; instant after that.
               </p>
               <button
                 onClick={() => fetchAll(false)}
@@ -2795,9 +2784,7 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
               <div className="flex items-center gap-3 mb-3">
                 <RefreshCw size={16} className="rust animate-spin" />
                 <span className="font-display ink text-sm" style={{ fontWeight: 600 }}>
-                  {progress.phase === 'verify'
-                    ? 'Verifying with multiple observers…'
-                    : 'Checking your hotspots…'}
+                  Reading hotspot histories…
                 </span>
               </div>
               <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
@@ -2810,9 +2797,7 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
                 />
               </div>
               <div className="font-mono text-[10px] ink-faint tracking-wider mt-2">
-                {progress.phase === 'verify'
-                  ? `${progress.done} / ${progress.total} species`
-                  : `${progress.done} / ${progress.total} hotspots`}
+                {progress.done} / {progress.total} day-records
               </div>
             </div>
           )}
@@ -2831,9 +2816,9 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
           {/* Empty result */}
           {tips !== null && shownTips.length === 0 && !loading && (
             <div className="text-center py-8 ink-faint text-sm">
-              No corroborated missed birds in the last 30 days. Vagrants and unconfirmed
-              sightings are filtered out — only species reported by ≥ 2 separate observers
-              count.
+              No corroborated missed birds in the last 7 days. Only species reported
+              by ≥ 2 separate observers at the same hotspot count — vagrants and
+              single-birder reports are filtered out.
             </div>
           )}
 
