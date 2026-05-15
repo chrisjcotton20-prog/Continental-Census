@@ -2528,15 +2528,17 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
       for (const c of candidates) {
         const obs = await getCachedSpecies(c.locId, c.speciesCode);
         if (!obs) continue; // not yet verified — wait for full scan
-        const dates = new Set(
-          obs
-            .map((o) => (typeof o.obsDt === 'string' ? o.obsDt.split(' ')[0] : null))
-            .filter(Boolean)
-        );
-        if (dates.size >= 2 && obs[0]?.obsDt) {
+        const observers = new Set();
+        for (const o of obs) {
+          const key = o.userDisplayName
+            ? `n:${o.userDisplayName}`
+            : (o.subId ? `s:${o.subId}` : null);
+          if (key) observers.add(key);
+        }
+        if (observers.size >= 2 && obs[0]?.obsDt) {
           verified.push({
             ...c,
-            dates,
+            observers,
             mostRecent: obs[0].obsDt,
           });
         }
@@ -2627,18 +2629,24 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
               obs = [];
             }
           }
-          // Count distinct calendar dates so multiple sightings on the same
-          // day (same checklist or same morning) don't trick the filter.
-          const dates = new Set(
-            (obs || [])
-              .map((o) => (typeof o.obsDt === 'string' ? o.obsDt.split(' ')[0] : null))
-              .filter(Boolean)
-          );
-          return { ...c, dates, mostRecent: (obs && obs[0]?.obsDt) || null };
+          // Count distinct observers. Each eBird record has a `userDisplayName`
+          // for the submitter; some older or privacy-shielded records may not,
+          // so we fall back to the unique checklist id (`subId`) for those.
+          // Two records with the same userDisplayName = the same person, so they
+          // collapse to one — we want INDEPENDENT corroboration, not the same
+          // birder reporting twice.
+          const observers = new Set();
+          for (const o of (obs || [])) {
+            const key = o.userDisplayName
+              ? `n:${o.userDisplayName}`
+              : (o.subId ? `s:${o.subId}` : null);
+            if (key) observers.add(key);
+          }
+          return { ...c, observers, mostRecent: (obs && obs[0]?.obsDt) || null };
         }));
 
         for (const r of results) {
-          if (r.dates.size >= 2 && r.mostRecent) {
+          if (r.observers.size >= 2 && r.mostRecent) {
             verified.push(r);
           }
         }
@@ -2672,7 +2680,7 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
         locId: v.locId,
         locName: v.locName,
         obsDt: v.mostRecent,
-        observationCount: v.dates.size,
+        observerCount: v.observers.size,
       });
     }
     const arr = [];
@@ -2768,8 +2776,8 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
               <h3 className="font-display ink text-lg mb-2" style={{ fontWeight: 600 }}>Ready to scan</h3>
               <p className="text-sm ink-soft leading-relaxed mb-4">
                 We'll check the last 30 days at your {targetLocations.length} most-birded hotspots, then
-                verify each missed species has been reported on at least two separate days — filtering
-                out vagrants and one-off sightings.
+                verify each missed species has been reported by at least two separate observers —
+                filtering out vagrants and unconfirmed sightings.
               </p>
               <button
                 onClick={() => fetchAll(false)}
@@ -2788,7 +2796,7 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
                 <RefreshCw size={16} className="rust animate-spin" />
                 <span className="font-display ink text-sm" style={{ fontWeight: 600 }}>
                   {progress.phase === 'verify'
-                    ? 'Verifying lingering species…'
+                    ? 'Verifying with multiple observers…'
                     : 'Checking your hotspots…'}
                 </span>
               </div>
@@ -2823,8 +2831,8 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
           {/* Empty result */}
           {tips !== null && shownTips.length === 0 && !loading && (
             <div className="text-center py-8 ink-faint text-sm">
-              No lingering missed birds in the last 30 days. Vagrants and one-off
-              sightings are filtered out — only species reported on ≥ 2 separate days
+              No corroborated missed birds in the last 30 days. Vagrants and unconfirmed
+              sightings are filtered out — only species reported by ≥ 2 separate observers
               count.
             </div>
           )}
@@ -2871,7 +2879,7 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
                           <span className="ink-faint"> · </span>
                           {t.locations[0].locName}
                           <span className="ink-faint font-mono ml-1">
-                            ({t.locations[0].observationCount} days)
+                            ({t.locations[0].observerCount} observers)
                           </span>
                         </div>
                       ) : (
@@ -2883,7 +2891,7 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
                               </span>
                               <span className="ink-faint truncate flex-1">{l.locName}</span>
                               <span className="ink-faint font-mono shrink-0">
-                                {l.observationCount}d
+                                {l.observerCount} obs
                               </span>
                             </li>
                           ))}
