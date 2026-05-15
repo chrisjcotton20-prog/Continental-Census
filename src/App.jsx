@@ -1046,6 +1046,18 @@ async function fetchRecentAtLocation(locId, apiKey, back = 30) {
   );
 }
 
+// All recent observations of ONE species at ONE hotspot. Unlike the call above
+// (which dedupes to one entry per species), this returns every individual
+// sighting. We use it to verify a candidate species has been reported more than
+// once — proxying "the bird has been hanging around" rather than a one-shot
+// flyby. Critical to the "no vagrants in tips" filter.
+async function fetchSpeciesAtLocation(locId, speciesCode, apiKey, back = 30) {
+  return ebirdFetch(
+    `/data/obs/${locId}/recent/${speciesCode}?back=${back}&maxResults=200&includeProvisional=false`,
+    apiKey,
+  );
+}
+
 // Lightweight per-hotspot cache (IndexedDB via the existing storage helper)
 async function getCachedHotspot(locId) {
   const v = await storage.get(`ebird:hotspot:${locId}`);
@@ -1055,6 +1067,23 @@ async function getCachedHotspot(locId) {
 }
 async function setCachedHotspot(locId, data) {
   await storage.set(`ebird:hotspot:${locId}`, { timestamp: Date.now(), data });
+}
+
+// Per-(hotspot, species) cache. Shorter TTL than hotspot cache because the
+// "is the bird still there" question is more time-sensitive than "what's the
+// general species composition of this place."
+const SPECIES_TTL_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
+async function getCachedSpecies(locId, speciesCode) {
+  const v = await storage.get(`ebird:species:${locId}:${speciesCode}`);
+  if (!v || !v.timestamp) return null;
+  if (Date.now() - v.timestamp > SPECIES_TTL_MS) return null;
+  return v.data || [];
+}
+async function setCachedSpecies(locId, speciesCode, data) {
+  await storage.set(`ebird:species:${locId}:${speciesCode}`, {
+    timestamp: Date.now(),
+    data: data || [],
+  });
 }
 
 // ---------- CSV parsing ----------
@@ -1436,11 +1465,14 @@ export default function BirdLifeTracker() {
       storage.del(STORAGE.points),
       storage.del(STORAGE.locations),
     ]);
-    // Also flush cached per-hotspot eBird responses
+    // Also flush cached per-hotspot and per-species eBird responses
     try {
-      const keys = await storage.list('ebird:hotspot:');
-      const list = keys?.keys || [];
-      await Promise.all(list.map((k) => storage.del(k)));
+      const [hotspotKeys, speciesKeys] = await Promise.all([
+        storage.list('ebird:hotspot:'),
+        storage.list('ebird:species:'),
+      ]);
+      const all = [...(hotspotKeys?.keys || []), ...(speciesKeys?.keys || [])];
+      await Promise.all(all.map((k) => storage.del(k)));
     } catch {
       // list() may not be supported by older storage; non-fatal
     }
@@ -1867,7 +1899,16 @@ export default function BirdLifeTracker() {
       )}
 
       {/* sightings map drawer */}
-      {showMap && <SightingsMapDrawer points={points || []} userCount={userCount} onClose={() => setShowMap(false)} />}
+      {showMap && (
+        <SightingsMapDrawer
+          points={points || []}
+          userCount={userCount}
+          familiesSeen={familiesSeen}
+          code3Seen={code3Seen}
+          locationCount={csvMeta?.locationCount || (points?.length ?? 0)}
+          onClose={() => setShowMap(false)}
+        />
+      )}
 
       {/* tips drawer — eBird API hints for missed species at visited hotspots */}
       {showTips && (
@@ -2442,57 +2483,9 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
       .sort((a, b) => (b.species?.length || 0) - (a.species?.length || 0));
   }, [locations]);
 
-  // Compute tips from a list of (location, recentObs) pairs.
-  // Output: one entry per missed species, with all reporting locations nested.
-  function computeTips(pairs) {
-    // Pass 1: for each location, find the freshest observation of each missed
-    // species. This collapses multiple sightings of the same bird at the same
-    // hotspot down to one (the most recent).
-    const bySpecies = new Map(); // sci → { sci, common, locations: [...] }
-    for (const { loc, obs } of pairs) {
-      const freshestAtThisLoc = new Map(); // sci → { obsDt, howMany, comName }
-      for (const o of obs) {
-        const sci = o.sciName;
-        if (!sci || !NATIVE_SCI.has(sci)) continue;
-        if (seenSci.has(sci)) continue;
-        const prev = freshestAtThisLoc.get(sci);
-        if (!prev || o.obsDt > prev.obsDt) {
-          freshestAtThisLoc.set(sci, {
-            obsDt: o.obsDt,
-            howMany: o.howMany ?? null,
-            comName: o.comName || sci,
-          });
-        }
-      }
-      // Merge this location's missed species into the global per-species map
-      for (const [sci, locObs] of freshestAtThisLoc) {
-        let entry = bySpecies.get(sci);
-        if (!entry) {
-          entry = { sci, common: locObs.comName, locations: [] };
-          bySpecies.set(sci, entry);
-        }
-        entry.locations.push({
-          locId: loc.id,
-          locName: loc.name || loc.id,
-          obsDt: locObs.obsDt,
-          howMany: locObs.howMany,
-        });
-      }
-    }
-    // Sort each species's location list by recency (most recent first), and
-    // surface the freshest date as `mostRecent` for top-level ranking.
-    const arr = [];
-    for (const entry of bySpecies.values()) {
-      entry.locations.sort((a, b) => b.obsDt.localeCompare(a.obsDt));
-      entry.mostRecent = entry.locations[0].obsDt;
-      arr.push(entry);
-    }
-    // Rank species by their freshest sighting anywhere
-    arr.sort((a, b) => b.mostRecent.localeCompare(a.mostRecent));
-    return arr;
-  }
-
-  // On first open, try to assemble tips from any cached hotspot data.
+  // On first open, assemble tips from any cached data (both hotspot recents
+  // and per-species verifications). Anything not in cache will simply be
+  // missing from results — the user fetches to fill it in.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -2500,25 +2493,63 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
         setTips([]);
         return;
       }
-      const pairs = [];
+      // Pass 1: pull cached hotspot recents and collect candidates
+      const candidates = [];
       let oldestTs = null;
       for (const loc of targetLocations) {
         const cached = await getCachedHotspot(loc.id);
-        if (cached) {
-          pairs.push({ loc, obs: cached });
-        }
-        // Track the cache age so we can show "as of N days ago"
+        if (!cached) continue;
         const raw = await storage.get(`ebird:hotspot:${loc.id}`);
         if (raw?.timestamp && (!oldestTs || raw.timestamp < oldestTs)) {
           oldestTs = raw.timestamp;
         }
+        for (const o of cached) {
+          if (!o.sciName || !NATIVE_SCI.has(o.sciName)) continue;
+          if (seenSci.has(o.sciName)) continue;
+          if (!o.speciesCode) continue;
+          candidates.push({
+            locId: loc.id,
+            locName: loc.name || loc.id,
+            speciesCode: o.speciesCode,
+            sciName: o.sciName,
+            comName: o.comName || o.sciName,
+          });
+        }
       }
       if (cancelled) return;
-      if (pairs.length > 0) {
-        setTips(computeTips(pairs));
+
+      if (candidates.length === 0) {
+        setTips(null); // signal "not fetched yet"
+        return;
+      }
+
+      // Pass 2: read cached species observations and filter to verified
+      const verified = [];
+      for (const c of candidates) {
+        const obs = await getCachedSpecies(c.locId, c.speciesCode);
+        if (!obs) continue; // not yet verified — wait for full scan
+        const dates = new Set(
+          obs
+            .map((o) => (typeof o.obsDt === 'string' ? o.obsDt.split(' ')[0] : null))
+            .filter(Boolean)
+        );
+        if (dates.size >= 2 && obs[0]?.obsDt) {
+          verified.push({
+            ...c,
+            dates,
+            mostRecent: obs[0].obsDt,
+          });
+        }
+      }
+      if (cancelled) return;
+
+      if (verified.length > 0) {
+        setTips(buildTipsFromVerified(verified));
         setCacheTimestamp(oldestTs);
       } else {
-        setTips(null); // signal "not fetched yet"
+        // Hotspot caches exist but no species verifications yet — treat as
+        // "needs fetching" so the Ready-to-scan card shows.
+        setTips(null);
       }
     })();
     return () => { cancelled = true; };
@@ -2533,36 +2564,125 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
 
     setLoading(true);
     setError(null);
-    setProgress({ done: 0, total: targetLocations.length });
+    setProgress({ phase: 'scan', done: 0, total: targetLocations.length });
 
     try {
+      // --- Phase 1: hotspot recents -------------------------------------------
+      // Get the species-deduped "what's been seen here lately" for each hotspot.
       const pairs = [];
       for (let i = 0; i < targetLocations.length; i++) {
         const loc = targetLocations[i];
-        // Use cache when not forcing
         let obs = forceRefresh ? null : await getCachedHotspot(loc.id);
         if (!obs) {
           try {
             obs = await fetchRecentAtLocation(loc.id, apiKey, 30);
             await setCachedHotspot(loc.id, obs);
           } catch (e) {
-            // Skip this location; keep going
-            console.warn('fetch failed for', loc.id, e);
+            console.warn('hotspot fetch failed for', loc.id, e);
             obs = [];
           }
         }
         pairs.push({ loc, obs });
-        setProgress({ done: i + 1, total: targetLocations.length });
-        // Be polite to the API — short pause between calls
+        setProgress({ phase: 'scan', done: i + 1, total: targetLocations.length });
         await new Promise((r) => setTimeout(r, 80));
       }
-      setTips(computeTips(pairs));
+
+      // --- Phase 2: enumerate (species, hotspot) candidates -------------------
+      // Anything native that the user hasn't seen anywhere is a candidate. We
+      // still need to verify it's been reported more than once at this hotspot.
+      const candidates = [];
+      for (const { loc, obs } of pairs) {
+        for (const o of obs) {
+          if (!o.sciName || !NATIVE_SCI.has(o.sciName)) continue;
+          if (seenSci.has(o.sciName)) continue;
+          if (!o.speciesCode) continue; // need the code for the verify call
+          candidates.push({
+            locId: loc.id,
+            locName: loc.name || loc.id,
+            speciesCode: o.speciesCode,
+            sciName: o.sciName,
+            comName: o.comName || o.sciName,
+          });
+        }
+      }
+
+      // --- Phase 3: verify each candidate has 2+ observations -----------------
+      // We require the species to have been reported on at least two separate
+      // days at the hotspot — that filters out one-day vagrants and lets the
+      // person actually go look for the bird with a reasonable chance.
+      setProgress({ phase: 'verify', done: 0, total: candidates.length });
+
+      const verified = [];
+      const concurrency = 3;
+      for (let i = 0; i < candidates.length; i += concurrency) {
+        const batch = candidates.slice(i, i + concurrency);
+        const results = await Promise.all(batch.map(async (c) => {
+          let obs = forceRefresh ? null : await getCachedSpecies(c.locId, c.speciesCode);
+          if (!obs) {
+            try {
+              obs = await fetchSpeciesAtLocation(c.locId, c.speciesCode, apiKey, 30);
+              await setCachedSpecies(c.locId, c.speciesCode, obs);
+            } catch (e) {
+              console.warn('species fetch failed for', c.locId, c.speciesCode, e);
+              obs = [];
+            }
+          }
+          // Count distinct calendar dates so multiple sightings on the same
+          // day (same checklist or same morning) don't trick the filter.
+          const dates = new Set(
+            (obs || [])
+              .map((o) => (typeof o.obsDt === 'string' ? o.obsDt.split(' ')[0] : null))
+              .filter(Boolean)
+          );
+          return { ...c, dates, mostRecent: (obs && obs[0]?.obsDt) || null };
+        }));
+
+        for (const r of results) {
+          if (r.dates.size >= 2 && r.mostRecent) {
+            verified.push(r);
+          }
+        }
+        setProgress({
+          phase: 'verify',
+          done: Math.min(i + concurrency, candidates.length),
+          total: candidates.length,
+        });
+        await new Promise((r) => setTimeout(r, 60));
+      }
+
+      setTips(buildTipsFromVerified(verified));
       setCacheTimestamp(Date.now());
     } catch (e) {
       setError(e.message || 'Fetch failed');
     } finally {
       setLoading(false);
     }
+  }
+
+  // Build the per-species tip list from verified candidate entries.
+  function buildTipsFromVerified(verified) {
+    const bySpecies = new Map();
+    for (const v of verified) {
+      let entry = bySpecies.get(v.sciName);
+      if (!entry) {
+        entry = { sci: v.sciName, common: v.comName, locations: [] };
+        bySpecies.set(v.sciName, entry);
+      }
+      entry.locations.push({
+        locId: v.locId,
+        locName: v.locName,
+        obsDt: v.mostRecent,
+        observationCount: v.dates.size,
+      });
+    }
+    const arr = [];
+    for (const entry of bySpecies.values()) {
+      entry.locations.sort((a, b) => b.obsDt.localeCompare(a.obsDt));
+      entry.mostRecent = entry.locations[0].obsDt;
+      arr.push(entry);
+    }
+    arr.sort((a, b) => b.mostRecent.localeCompare(a.mostRecent));
+    return arr;
   }
 
   // Helpers for date display
@@ -2647,8 +2767,9 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
             <div className="surface-1 rounded-2xl p-5 mb-3 text-center">
               <h3 className="font-display ink text-lg mb-2" style={{ fontWeight: 600 }}>Ready to scan</h3>
               <p className="text-sm ink-soft leading-relaxed mb-4">
-                We'll check the last 30 days of reports at your {targetLocations.length} most-birded hotspots.
-                Takes about {Math.ceil(targetLocations.length * 0.15)} seconds.
+                We'll check the last 30 days at your {targetLocations.length} most-birded hotspots, then
+                verify each missed species has been reported on at least two separate days — filtering
+                out vagrants and one-off sightings.
               </p>
               <button
                 onClick={() => fetchAll(false)}
@@ -2666,7 +2787,9 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
               <div className="flex items-center gap-3 mb-3">
                 <RefreshCw size={16} className="rust animate-spin" />
                 <span className="font-display ink text-sm" style={{ fontWeight: 600 }}>
-                  Checking your hotspots…
+                  {progress.phase === 'verify'
+                    ? 'Verifying lingering species…'
+                    : 'Checking your hotspots…'}
                 </span>
               </div>
               <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
@@ -2679,7 +2802,9 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
                 />
               </div>
               <div className="font-mono text-[10px] ink-faint tracking-wider mt-2">
-                {progress.done} / {progress.total} hotspots
+                {progress.phase === 'verify'
+                  ? `${progress.done} / ${progress.total} species`
+                  : `${progress.done} / ${progress.total} hotspots`}
               </div>
             </div>
           )}
@@ -2698,8 +2823,9 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
           {/* Empty result */}
           {tips !== null && shownTips.length === 0 && !loading && (
             <div className="text-center py-8 ink-faint text-sm">
-              No missed birds in the last 30 days. Either you've seen them all,
-              or your spots are quiet right now.
+              No lingering missed birds in the last 30 days. Vagrants and one-off
+              sightings are filtered out — only species reported on ≥ 2 separate days
+              count.
             </div>
           )}
 
@@ -2744,6 +2870,9 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
                           <span className="rust" style={{ fontWeight: 500 }}>{relDate(t.locations[0].obsDt)}</span>
                           <span className="ink-faint"> · </span>
                           {t.locations[0].locName}
+                          <span className="ink-faint font-mono ml-1">
+                            ({t.locations[0].observationCount} days)
+                          </span>
                         </div>
                       ) : (
                         <ul className="mt-1.5 space-y-1">
@@ -2752,7 +2881,10 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
                               <span className="rust shrink-0" style={{ fontWeight: 500, minWidth: '4.5em' }}>
                                 {relDate(l.obsDt)}
                               </span>
-                              <span className="ink-faint truncate">{l.locName}</span>
+                              <span className="ink-faint truncate flex-1">{l.locName}</span>
+                              <span className="ink-faint font-mono shrink-0">
+                                {l.observationCount}d
+                              </span>
                             </li>
                           ))}
                         </ul>
@@ -2918,7 +3050,7 @@ function heatColor(t) {
   return `rgba(${c[0]},${c[1]},${c[2]},${c[3]})`;
 }
 
-function SightingsMapDrawer({ points, userCount, onClose }) {
+function SightingsMapDrawer({ points, userCount, familiesSeen = 0, code3Seen = 0, locationCount = 0, onClose }) {
   const svgContainerRef = useRef(null);
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState(null);
@@ -3028,20 +3160,58 @@ function SightingsMapDrawer({ points, userCount, onClose }) {
       canvas.height = H;
       const ctx = canvas.getContext('2d');
 
-      // Background — solid dark teal
-      ctx.fillStyle = '#0c1f1f';
+      // --- helpers ---
+      function rrPath(x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.arcTo(x + w, y, x + w, y + r, r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+        ctx.lineTo(x + r, y + h);
+        ctx.arcTo(x, y + h, x, y + h - r, r);
+        ctx.lineTo(x, y + r);
+        ctx.arcTo(x, y, x + r, y, r);
+        ctx.closePath();
+      }
+      function drawGlass(x, y, w, h, r) {
+        // Glassy fill: very subtle top-to-bottom highlight
+        rrPath(x, y, w, h, r);
+        const fillGrad = ctx.createLinearGradient(0, y, 0, y + h);
+        fillGrad.addColorStop(0, 'rgba(255,255,255,0.055)');
+        fillGrad.addColorStop(1, 'rgba(255,255,255,0.012)');
+        ctx.fillStyle = fillGrad;
+        ctx.fill();
+        // Beveled border: brighter at top, dimmer at bottom — the "Liquid Glass" cue
+        rrPath(x, y, w, h, r);
+        const borderGrad = ctx.createLinearGradient(0, y, 0, y + h);
+        borderGrad.addColorStop(0, 'rgba(255,255,255,0.22)');
+        borderGrad.addColorStop(0.5, 'rgba(255,255,255,0.06)');
+        borderGrad.addColorStop(1, 'rgba(255,255,255,0.03)');
+        ctx.strokeStyle = borderGrad;
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+      }
+
+      // === Background: subtle vertical gradient (lighter top → deeper bottom) ===
+      const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+      bgGrad.addColorStop(0, '#0e2a2a');
+      bgGrad.addColorStop(0.35, '#0c1f1f');
+      bgGrad.addColorStop(1, '#07171b');
+      ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, W, H);
 
-      // Soft warm halo behind the count area
-      const halo = ctx.createRadialGradient(W / 2, 450, 100, W / 2, 450, 700);
-      halo.addColorStop(0, 'rgba(249, 115, 22, 0.10)');
-      halo.addColorStop(0.6, 'rgba(249, 115, 22, 0.03)');
+      // Warm orange halo behind the hero card for depth
+      const halo = ctx.createRadialGradient(W / 2, 420, 80, W / 2, 420, 700);
+      halo.addColorStop(0, 'rgba(249, 115, 22, 0.12)');
+      halo.addColorStop(0.5, 'rgba(249, 115, 22, 0.04)');
       halo.addColorStop(1, 'rgba(249, 115, 22, 0)');
       ctx.fillStyle = halo;
       ctx.fillRect(0, 0, W, H);
 
       const count = userCount ?? 0;
       const pct = (count / TOTAL) * 100;
+      const cx = W / 2;
 
       // === Top-left logo: feather + CENSUS wordmark ===
       ctx.save();
@@ -3065,81 +3235,125 @@ function SightingsMapDrawer({ points, userCount, onClose }) {
       ctx.textBaseline = 'alphabetic';
       ctx.fillText('CENSUS', 130, 100);
 
-      // === Top section: count + percentage ===
-      ctx.textAlign = 'center';
-      const cx = W / 2;
+      // === Hero glass card: count + percentage ===
+      const heroX = 60, heroY = 180, heroW = 960, heroH = 480;
+      drawGlass(heroX, heroY, heroW, heroH, 36);
 
-      // Giant count number
-      ctx.font = '800 280px Montserrat, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+
+      // Eyebrow inside hero
+      ctx.font = '600 14px "JetBrains Mono", ui-monospace, monospace';
+      ctx.fillStyle = '#6b7773';
+      ctx.fillText('LIFE LIST', cx, heroY + 50);
+
+      // Giant count
+      ctx.font = '800 260px Montserrat, system-ui, sans-serif';
       ctx.fillStyle = '#f5f5f4';
-      ctx.fillText(`${count}`, cx, 440);
+      ctx.fillText(`${count}`, cx, heroY + 280);
 
       // "of 774 native US birds"
-      ctx.font = '500 38px Montserrat, system-ui, sans-serif';
+      ctx.font = '500 36px Montserrat, system-ui, sans-serif';
       ctx.fillStyle = '#a8b1ae';
-      ctx.fillText(`of ${TOTAL} native US birds`, cx, 510);
+      ctx.fillText(`of ${TOTAL} native US birds`, cx, heroY + 345);
 
       // Orange accent line
       ctx.strokeStyle = '#fb923c';
       ctx.lineWidth = 4;
       ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(cx - 60, 565);
-      ctx.lineTo(cx + 60, 565);
+      ctx.moveTo(cx - 56, heroY + 388);
+      ctx.lineTo(cx + 56, heroY + 388);
       ctx.stroke();
 
-      // Percentage — toned-down weight & size
-      ctx.font = '600 42px Montserrat, system-ui, sans-serif';
+      // Percentage (orange)
+      ctx.font = '600 40px Montserrat, system-ui, sans-serif';
       ctx.fillStyle = '#fb923c';
-      ctx.fillText(`${pct.toFixed(1)}% complete`, cx, 625);
+      ctx.fillText(`${pct.toFixed(1)}% complete`, cx, heroY + 440);
 
-      // === Middle: map with feathered edge fade ===
+      // === Stats strip: three small glass cards ===
+      const stripY = heroY + heroH + 30; // y=690
+      const stripH = 150;
+      const gap = 12;
+      const cardW = (W - 60 * 2 - gap * 2) / 3;
+
+      const stats = [
+        {
+          label: 'FAMILIES',
+          value: `${familiesSeen}`,
+          sub: `of ${FAMILY_BOUNDARIES.length}`,
+          color: '#f5f5f4',
+        },
+        {
+          label: 'RARE FINDS',
+          value: `${code3Seen}`,
+          sub: 'ABA Code 3',
+          color: '#fb923c',
+        },
+        {
+          label: 'LOCATIONS',
+          value: locationCount.toLocaleString(),
+          sub: 'birded',
+          color: '#f5f5f4',
+        },
+      ];
+
+      stats.forEach((s, i) => {
+        const x = 60 + i * (cardW + gap);
+        drawGlass(x, stripY, cardW, stripH, 22);
+
+        const cxStat = x + cardW / 2;
+        // Label (mono, eyebrow)
+        ctx.font = '600 13px "JetBrains Mono", ui-monospace, monospace';
+        ctx.fillStyle = '#6b7773';
+        ctx.fillText(s.label, cxStat, stripY + 36);
+        // Big number
+        ctx.font = '700 64px Montserrat, system-ui, sans-serif';
+        ctx.fillStyle = s.color;
+        ctx.fillText(s.value, cxStat, stripY + 100);
+        // Sub-label
+        ctx.font = '500 14px Montserrat, system-ui, sans-serif';
+        ctx.fillStyle = '#6b7773';
+        ctx.fillText(s.sub, cxStat, stripY + 125);
+      });
+
+      // === Map with feathered edge fade ===
       const mapW = 1040;
       const mapH = Math.round(mapW * (MAP_H / MAP_W));
       const mapX = (W - mapW) / 2;
-      const mapY = 740;
+      const mapY = stripY + stripH + 40; // y=920
 
-      // Render the SVG into a temp canvas so we can fade its edges before
-      // compositing onto the main card — without the temp canvas the fade
-      // would also erase the cards' dark teal background.
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = mapW;
       tempCanvas.height = mapH;
       const tempCtx = tempCanvas.getContext('2d');
       tempCtx.drawImage(img, 0, 0, mapW, mapH);
 
-      // Soft edge fade — erase the outer 8% of each edge with a smooth gradient
       tempCtx.globalCompositeOperation = 'destination-out';
       const fadePx = Math.round(mapW * 0.08);
-      // Left
-      let g = tempCtx.createLinearGradient(0, 0, fadePx, 0);
-      g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
-      tempCtx.fillStyle = g; tempCtx.fillRect(0, 0, fadePx, mapH);
-      // Right
-      g = tempCtx.createLinearGradient(mapW - fadePx, 0, mapW, 0);
-      g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,1)');
-      tempCtx.fillStyle = g; tempCtx.fillRect(mapW - fadePx, 0, fadePx, mapH);
-      // Top
-      g = tempCtx.createLinearGradient(0, 0, 0, fadePx);
-      g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
-      tempCtx.fillStyle = g; tempCtx.fillRect(0, 0, mapW, fadePx);
-      // Bottom
-      g = tempCtx.createLinearGradient(0, mapH - fadePx, 0, mapH);
-      g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,1)');
-      tempCtx.fillStyle = g; tempCtx.fillRect(0, mapH - fadePx, mapW, fadePx);
+      let fg = tempCtx.createLinearGradient(0, 0, fadePx, 0);
+      fg.addColorStop(0, 'rgba(0,0,0,1)'); fg.addColorStop(1, 'rgba(0,0,0,0)');
+      tempCtx.fillStyle = fg; tempCtx.fillRect(0, 0, fadePx, mapH);
+      fg = tempCtx.createLinearGradient(mapW - fadePx, 0, mapW, 0);
+      fg.addColorStop(0, 'rgba(0,0,0,0)'); fg.addColorStop(1, 'rgba(0,0,0,1)');
+      tempCtx.fillStyle = fg; tempCtx.fillRect(mapW - fadePx, 0, fadePx, mapH);
+      fg = tempCtx.createLinearGradient(0, 0, 0, fadePx);
+      fg.addColorStop(0, 'rgba(0,0,0,1)'); fg.addColorStop(1, 'rgba(0,0,0,0)');
+      tempCtx.fillStyle = fg; tempCtx.fillRect(0, 0, mapW, fadePx);
+      fg = tempCtx.createLinearGradient(0, mapH - fadePx, 0, mapH);
+      fg.addColorStop(0, 'rgba(0,0,0,0)'); fg.addColorStop(1, 'rgba(0,0,0,1)');
+      tempCtx.fillStyle = fg; tempCtx.fillRect(0, mapH - fadePx, mapW, fadePx);
 
-      // Composite faded map onto main canvas
       ctx.drawImage(tempCanvas, mapX, mapY);
 
-      // === Bottom: invitation caption + CTA ===
-      ctx.font = '600 44px Montserrat, system-ui, sans-serif';
-      ctx.fillStyle = '#f5f5f4';
+      // === Caption + CTA at the bottom ===
       ctx.textAlign = 'center';
-      ctx.fillText(`How many have YOU found?`, cx, 1680);
+      ctx.font = '600 42px Montserrat, system-ui, sans-serif';
+      ctx.fillStyle = '#f5f5f4';
+      ctx.fillText(`How many have YOU found?`, cx, 1730);
 
-      ctx.font = '500 28px Montserrat, system-ui, sans-serif';
+      ctx.font = '500 26px Montserrat, system-ui, sans-serif';
       ctx.fillStyle = '#fb923c';
-      ctx.fillText(`Find yours at CENSUS`, cx, 1740);
+      ctx.fillText(`Find yours at CENSUS`, cx, 1782);
 
       URL.revokeObjectURL(svgUrl);
 
