@@ -3533,11 +3533,14 @@ function SightingsMapView({
   }
 
   return (
-    <div className="relative max-w-3xl mx-auto px-4 sm:px-8 py-6 sm:py-10">
+    <div
+      className="relative max-w-3xl mx-auto px-4 sm:px-8 py-4 sm:py-6 flex flex-col"
+      style={{ minHeight: '100vh' }}
+    >
       {/* Page header — replaces the modal close X with a back arrow. The map
           gets its own dedicated route-like view rather than living as an
           overlay over the dashboard. */}
-      <header className="anim-1 flex items-center justify-between mb-6">
+      <header className="anim-1 flex items-center justify-between mb-4 shrink-0">
         <button
           onClick={onBack}
           className="btn-ghost rounded-full pl-3 pr-4 py-2 text-sm inline-flex items-center gap-2"
@@ -3550,11 +3553,11 @@ function SightingsMapView({
       </header>
 
       {/* Title block */}
-      <div className="anim-2 mb-6">
-        <h1 className="font-display ink text-3xl sm:text-4xl mb-1 leading-[1.05]" style={{ fontWeight: 700 }}>
+      <div className="anim-2 mb-3 shrink-0">
+        <h1 className="font-display ink text-2xl sm:text-3xl mb-1 leading-[1.05]" style={{ fontWeight: 700 }}>
           {mode === 'first' ? 'Where you discovered birds' : "Where you've found birds"}
         </h1>
-        <p className="ink-soft text-sm">
+        <p className="ink-soft text-xs sm:text-sm">
           {mode === 'first' ? (
             <>
               one point per species at its <span className="rust" style={{ fontWeight: 600 }}>first-found</span> location
@@ -3580,7 +3583,7 @@ function SightingsMapView({
       </div>
 
       {/* Filter pills */}
-      <div className="anim-3 mb-5 flex items-center gap-2">
+      <div className="anim-3 mb-3 flex items-center gap-2 shrink-0">
         <button
           onClick={() => setMode('all')}
           className={`rounded-full px-4 py-1.5 text-xs transition-colors ${mode === 'all' ? 'btn-ink' : 'btn-ghost'}`}
@@ -3590,23 +3593,24 @@ function SightingsMapView({
         </button>
         <button
           onClick={() => setMode('first')}
-          disabled={!firstAvailable}
-          className={`rounded-full px-4 py-1.5 text-xs transition-colors ${mode === 'first' ? 'btn-ink' : 'btn-ghost'} ${!firstAvailable ? 'opacity-40 cursor-not-allowed' : ''}`}
+          className={`rounded-full px-4 py-1.5 text-xs transition-colors ${mode === 'first' ? 'btn-ink' : 'btn-ghost'}`}
           aria-pressed={mode === 'first'}
-          title={firstAvailable ? 'Heat by first-found location of each species' : 'Re-upload your CSV to enable first-sightings'}
+          title="Heat by first-found location of each species"
         >
           First sightings
         </button>
       </div>
 
-      {/* Map card */}
+      {/* Map card — flex-1 to consume remaining vertical space so the page
+          fits the viewport without scrolling. */}
       <div
-        className="anim-4 rounded-2xl overflow-hidden relative"
+        className="anim-4 rounded-2xl overflow-hidden relative flex-1 min-h-0 flex flex-col"
         style={{ background: '#142926', border: '1px solid rgba(255,255,255,0.08)' }}
       >
 
-        {/* map body */}
-        <div className="relative flex-1 overflow-auto p-2 sm:p-4">
+        {/* map body — flex-1 itself so the SVG fills whatever space is left
+            inside the card after the share footer is accounted for. */}
+        <div className="relative flex-1 min-h-0 overflow-hidden p-2 sm:p-4 flex flex-col">
           {projectedCount === 0 ? (
             <div className="text-center py-12 ink-faint text-sm">
               {mode === 'first' && !firstAvailable ? (
@@ -3620,13 +3624,15 @@ function SightingsMapView({
               )}
             </div>
           ) : (
-            <div className="relative w-full" ref={svgContainerRef}>
-              <svg
-                viewBox={`0 0 ${MAP_W} ${MAP_H}`}
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-full h-auto"
-                style={{ background: 'transparent' }}
-              >
+            <div className="relative flex-1 min-h-0 flex flex-col w-full" ref={svgContainerRef}>
+              <div className="flex-1 min-h-0 flex items-center justify-center">
+                <svg
+                  viewBox={`0 0 ${MAP_W} ${MAP_H}`}
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="max-w-full max-h-full"
+                  preserveAspectRatio="xMidYMid meet"
+                  style={{ background: 'transparent', width: '100%', height: '100%' }}
+                >
                 <defs>
                   {/* A *dilated* clip for the heatmap. With a strict clipPath
                       tied to the literal US outline, coastal hotspots get
@@ -3693,9 +3699,10 @@ function SightingsMapView({
                   strokeLinejoin="round"
                 />
               </svg>
+              </div>
 
               {/* Continuous gradient legend */}
-              <div className="mt-4 flex items-center justify-center gap-3 flex-wrap">
+              <div className="mt-2 flex items-center justify-center gap-3 flex-wrap shrink-0">
                 <span className="font-mono text-[10px] ink-faint tracking-widest uppercase">Few species</span>
                 <svg width="160" height="12" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block' }}>
                   <defs>
@@ -3745,6 +3752,14 @@ function SightingsMapView({
           </div>
         )}
       </div>
+
+      {/* Page-level attribution footer — same on dashboard and map page. */}
+      <footer className="mt-4 pt-3 border-t rule text-center anim-5 shrink-0">
+        <p className="font-mono text-[9px] ink-faint tracking-[0.25em] uppercase leading-relaxed">
+          Sightings · ebird (Cornell Lab of Ornithology)<br />
+          Total · ABA Checklist v8.0.7
+        </p>
+      </footer>
     </div>
   );
 }
