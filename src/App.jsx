@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Papa from 'papaparse';
-import { Upload, RefreshCw, Settings, AlertCircle, Check, X, FileText, Feather, List, Search, Square, CheckSquare, Map as MapIcon, ChevronRight, Share2, Plus, Download } from 'lucide-react';
+import { Upload, RefreshCw, Settings, AlertCircle, Check, X, FileText, Feather, List, Search, Square, CheckSquare, Map as MapIcon, ChevronLeft, ChevronRight, Share2, Plus, Download } from 'lucide-react';
 import { storage } from './lib/storage.js';
 import { geoAlbersUsa, geoPath } from 'd3-geo';
 import { contourDensity } from 'd3-contour';
@@ -1050,6 +1050,7 @@ const STORAGE = {
   csvMeta: 'ebird:csvMeta',
   seenSci: 'ebird:seenSci',
   points: 'ebird:points',
+  firstSightingPoints: 'ebird:firstSightingPoints',
   locations: 'ebird:locations',
   apiKey: 'ebird:apiKey',
   // Cached eBird API responses live under 'ebird:hotspot:{locId}'
@@ -1163,6 +1164,11 @@ function parseEBirdCsv(file) {
           // `locations` keeps full data needed for both the heatmap (lng/lat/weight)
           // AND the tips feature (id/name/native species list).
           const locations = new Map();
+          // For "First Sightings" heatmap: track the EARLIEST observation of each
+          // species across all rows. The location of that first sighting is where
+          // the user "discovered" that species. We keep date as a comparable epoch
+          // number rather than parsing per-row repeatedly.
+          const firstSightingByss = new Map(); // sci → {ts, lng, lat}
           let earliest = null, latest = null;
           let totalObservations = 0;
 
@@ -1170,6 +1176,10 @@ function parseEBirdCsv(file) {
             totalObservations++;
             const sci = (r[sciKey] || '').trim();
             const com = r[comKey];
+            const dStr = r[dateKey];
+            const dt = dStr ? new Date(dStr) : null;
+            const dtValid = dt && !isNaN(dt);
+
             if (isCountable(sci, com)) {
               const speciesKey = sci || com;
               allSpecies.add(speciesKey);
@@ -1197,21 +1207,45 @@ function parseEBirdCsv(file) {
                 if (sci && NATIVE_SCI.has(sci)) {
                   loc.nativeSpecies.add(sci);
                 }
+                // Track the first sighting of this species. Use scientific name
+                // when available; otherwise the common name (so non-native
+                // countable species still contribute to the discovery map).
+                const key = sci || com;
+                if (key && dtValid) {
+                  const ts = dt.getTime();
+                  const prev = firstSightingByss.get(key);
+                  if (!prev || ts < prev.ts) {
+                    firstSightingByss.set(key, { ts, lng, lat });
+                  }
+                }
               }
             }
-            const dStr = r[dateKey];
-            if (dStr) {
-              const d = new Date(dStr);
-              if (!isNaN(d)) {
-                if (!earliest || d < earliest) earliest = d;
-                if (!latest || d > latest) latest = d;
-              }
+            if (dtValid) {
+              if (!earliest || dt < earliest) earliest = dt;
+              if (!latest || dt > latest) latest = dt;
             }
           }
 
+          // Aggregate first sightings by location: each species's first-found
+          // location gets +1 weight. This flattens the heatmap compared to the
+          // overall-sightings version, since recurring visits to a single
+          // hotspot only add weight for *new* species there, not every species
+          // re-seen.
+          const firstByLoc = new Map(); // "lng,lat" → {lng, lat, count}
+          for (const { lng, lat } of firstSightingByss.values()) {
+            const k = `${lng.toFixed(5)},${lat.toFixed(5)}`;
+            let entry = firstByLoc.get(k);
+            if (!entry) {
+              entry = { lng, lat, count: 0 };
+              firstByLoc.set(k, entry);
+            }
+            entry.count++;
+          }
+
           // Outputs:
-          //   points     — [[lng, lat, speciesCount], ...] for the heatmap
-          //   locations  — [{id, name, lng, lat, species, nativeSpecies}, ...] for tips
+          //   points              — [[lng, lat, speciesCount], ...] heatmap, ALL species seen
+          //   firstSightingPoints — [[lng, lat, newSpeciesCount], ...] heatmap, FIRST sightings only
+          //   locations           — [{id, name, lng, lat, species, nativeSpecies}, ...] for tips
           const points = [];
           const locationsArr = [];
           for (const loc of locations.values()) {
@@ -1228,12 +1262,17 @@ function parseEBirdCsv(file) {
               });
             }
           }
+          const firstSightingPoints = [];
+          for (const { lng, lat, count } of firstByLoc.values()) {
+            firstSightingPoints.push([lng, lat, count]);
+          }
 
           resolve({
             count: nativeSci.size,
             allCount: allSpecies.size,
             seenSci: Array.from(nativeSci),
             points,
+            firstSightingPoints,
             locations: locationsArr,
             meta: {
               observations: totalObservations,
@@ -1244,6 +1283,7 @@ function parseEBirdCsv(file) {
               allCount: allSpecies.size,
               locationCount: points.length,
               ebirdLocations: locationsArr.length,
+              firstSightingLocations: firstSightingPoints.length,
             },
           });
         } catch (e) {
@@ -1281,7 +1321,8 @@ export default function BirdLifeTracker() {
   const [userCount, setUserCount] = useState(null);
   const [csvMeta, setCsvMeta] = useState(null);
   const [seenSci, setSeenSci] = useState(() => new Set());
-  const [points, setPoints] = useState(null); // [[lng, lat, w], ...] for heatmap
+  const [points, setPoints] = useState(null); // [[lng, lat, w], ...] for heatmap, all species
+  const [firstSightingPoints, setFirstSightingPoints] = useState(null); // [[lng, lat, w], ...] for first-sighting heatmap
   const [locations, setLocations] = useState(null); // [{id, name, lng, lat, species}] for tips
   const [apiKey, setApiKey] = useState(null);
   const [showTips, setShowTips] = useState(false);
@@ -1295,7 +1336,10 @@ export default function BirdLifeTracker() {
   // When non-null, the species list drawer is opened in a scoped view
   // (e.g. only Code 3 birds, or only species in one family).
   const [listFilter, setListFilter] = useState(null);
-  const [showMap, setShowMap] = useState(false);
+  // Top-level view router. 'dashboard' is the count/stats home; 'map' is the
+  // full-page heatmap. Keeping this on the parent (rather than a route) lets
+  // us swap the entire content area without losing state in the other view.
+  const [view, setView] = useState('dashboard');
   const [showInstall, setShowInstall] = useState(false);
   // Deferred install prompt from Chrome/Edge/Samsung Internet — captured at
   // load time, fired only when the user clicks our install button. iOS Safari
@@ -1396,11 +1440,12 @@ export default function BirdLifeTracker() {
   // hydrate from storage
   useEffect(() => {
     (async () => {
-      const [u, m, s, p, l, k] = await Promise.all([
+      const [u, m, s, p, fp, l, k] = await Promise.all([
         storage.get(STORAGE.userCount),
         storage.get(STORAGE.csvMeta),
         storage.get(STORAGE.seenSci),
         storage.get(STORAGE.points),
+        storage.get(STORAGE.firstSightingPoints),
         storage.get(STORAGE.locations),
         storage.get(STORAGE.apiKey),
       ]);
@@ -1408,6 +1453,7 @@ export default function BirdLifeTracker() {
       if (m) { try { setCsvMeta(JSON.parse(m)); } catch {} }
       if (s) { try { setSeenSci(new Set(JSON.parse(s))); } catch {} }
       if (p) { try { setPoints(JSON.parse(p)); } catch {} }
+      if (fp) { try { setFirstSightingPoints(JSON.parse(fp)); } catch {} }
       if (l) { try { setLocations(JSON.parse(l)); } catch {} }
       if (k) setApiKey(k);
       setHydrated(true);
@@ -1468,17 +1514,19 @@ export default function BirdLifeTracker() {
     setLoading(true);
     setError(null);
     try {
-      const { count, allCount, seenSci: nextSeen, points: nextPoints, locations: nextLocations, meta } = await parseEBirdCsv(file);
+      const { count, allCount, seenSci: nextSeen, points: nextPoints, firstSightingPoints: nextFirstSightingPoints, locations: nextLocations, meta } = await parseEBirdCsv(file);
       const seenSet = new Set(nextSeen);
       setUserCount(count);
       setCsvMeta(meta);
       setSeenSci(seenSet);
       setPoints(nextPoints);
+      setFirstSightingPoints(nextFirstSightingPoints);
       setLocations(nextLocations);
       await storage.set(STORAGE.userCount, String(count));
       await storage.set(STORAGE.csvMeta, JSON.stringify(meta));
       await storage.set(STORAGE.seenSci, JSON.stringify(nextSeen));
       await storage.set(STORAGE.points, JSON.stringify(nextPoints));
+      await storage.set(STORAGE.firstSightingPoints, JSON.stringify(nextFirstSightingPoints));
       await storage.set(STORAGE.locations, JSON.stringify(nextLocations));
       const extra = allCount - count;
       const extraNote = extra > 0 ? ` (${extra} non-native or rare visitor${extra === 1 ? '' : 's'} excluded)` : '';
@@ -1509,6 +1557,7 @@ export default function BirdLifeTracker() {
       storage.del(STORAGE.csvMeta),
       storage.del(STORAGE.seenSci),
       storage.del(STORAGE.points),
+      storage.del(STORAGE.firstSightingPoints),
       storage.del(STORAGE.locations),
     ]);
     // Also flush cached per-hotspot, per-species, and historic-day eBird data
@@ -1531,6 +1580,7 @@ export default function BirdLifeTracker() {
     setCsvMeta(null);
     setSeenSci(new Set());
     setPoints(null);
+    setFirstSightingPoints(null);
     setLocations(null);
     setSuccess('Cleared.');
   }
@@ -1649,6 +1699,7 @@ export default function BirdLifeTracker() {
         .lift:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.18); }
       `}</style>
 
+      {view === 'dashboard' && (
       <div className="relative max-w-3xl mx-auto px-6 sm:px-10 py-8 sm:py-12">
         <header className="anim-1 flex items-center justify-between mb-10 sm:mb-14">
           <div className="flex items-center gap-2.5">
@@ -1794,7 +1845,7 @@ export default function BirdLifeTracker() {
               </button>
               {points && points.length > 0 && (
                 <button
-                  onClick={() => setShowMap(true)}
+                  onClick={() => setView('map')}
                   className="btn-ghost rounded-full px-5 py-2.5 text-sm inline-flex items-center gap-2"
                 >
                   <MapIcon size={14} strokeWidth={2} />
@@ -1917,6 +1968,20 @@ export default function BirdLifeTracker() {
           </p>
         </footer>
       </div>
+      )}
+
+      {view === 'map' && (
+        <SightingsMapView
+          pointsAll={points || []}
+          pointsFirst={firstSightingPoints}
+          userCount={userCount}
+          familiesSeen={familiesSeen}
+          code3Seen={code3Seen}
+          atRiskSeen={atRiskSeen}
+          locationCount={csvMeta?.locationCount || (points?.length ?? 0)}
+          onBack={() => setView('dashboard')}
+        />
+      )}
 
       {/* toasts */}
       {(error || success) && (
@@ -1954,19 +2019,6 @@ export default function BirdLifeTracker() {
           seenSci={seenSci}
           onClose={() => { setShowList(false); }}
           {...(listFilter || {})}
-        />
-      )}
-
-      {/* sightings map drawer */}
-      {showMap && (
-        <SightingsMapDrawer
-          points={points || []}
-          userCount={userCount}
-          familiesSeen={familiesSeen}
-          code3Seen={code3Seen}
-          atRiskSeen={atRiskSeen}
-          locationCount={csvMeta?.locationCount || (points?.length ?? 0)}
-          onClose={() => setShowMap(false)}
         />
       )}
 
@@ -2059,7 +2111,7 @@ export default function BirdLifeTracker() {
               </button>
               {points && points.length > 0 && (
                 <button
-                  onClick={() => { setShowMap(true); setShowSettings(false); }}
+                  onClick={() => { setView('map'); setShowSettings(false); }}
                   className="block w-full text-left px-3 py-2 rounded-lg ink-soft hover:ink hover:bg-white/5 text-sm transition-colors"
                 >
                   Sightings map →
@@ -3123,10 +3175,27 @@ function heatColor(t) {
   return `rgba(${c[0]},${c[1]},${c[2]},${c[3]})`;
 }
 
-function SightingsMapDrawer({ points, userCount, familiesSeen = 0, code3Seen = 0, atRiskSeen = 0, locationCount = 0, onClose }) {
+function SightingsMapView({
+  pointsAll,
+  pointsFirst,
+  userCount,
+  familiesSeen = 0,
+  code3Seen = 0,
+  atRiskSeen = 0,
+  locationCount = 0,
+  onBack,
+}) {
   const svgContainerRef = useRef(null);
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState(null);
+  // Filter mode. 'all' = aggregate species count per location (the original
+  // heatmap; biased toward most-birded spots). 'first' = each species's
+  // first-found location, weighted by how many species you discovered there.
+  // The first-sightings view flattens the heat because repeat visits to the
+  // same hotspot stop contributing once you've seen everything there.
+  const [mode, setMode] = useState('all');
+  const points = (mode === 'first' ? pointsFirst : pointsAll) || [];
+  const firstAvailable = Array.isArray(pointsFirst) && pointsFirst.length > 0;
 
   // Project points to pixel space. Each point is [lng, lat, weight] where
   // weight is unique species count at that location. Older data stored as
@@ -3464,39 +3533,91 @@ function SightingsMapDrawer({ points, userCount, familiesSeen = 0, code3Seen = 0
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center p-2 sm:p-4" style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }} onClick={onClose}>
+    <div className="relative max-w-3xl mx-auto px-4 sm:px-8 py-6 sm:py-10">
+      {/* Page header — replaces the modal close X with a back arrow. The map
+          gets its own dedicated route-like view rather than living as an
+          overlay over the dashboard. */}
+      <header className="anim-1 flex items-center justify-between mb-6">
+        <button
+          onClick={onBack}
+          className="btn-ghost rounded-full pl-3 pr-4 py-2 text-sm inline-flex items-center gap-2"
+          aria-label="Back to dashboard"
+        >
+          <ChevronLeft size={16} strokeWidth={2.25} />
+          <span className="font-mono text-[10px] tracking-[0.2em] uppercase">Census</span>
+        </button>
+        <div className="font-mono text-[9px] ink-faint tracking-[0.2em] uppercase">Cartography</div>
+      </header>
+
+      {/* Title block */}
+      <div className="anim-2 mb-6">
+        <h1 className="font-display ink text-3xl sm:text-4xl mb-1 leading-[1.05]" style={{ fontWeight: 700 }}>
+          {mode === 'first' ? 'Where you discovered birds' : "Where you've found birds"}
+        </h1>
+        <p className="ink-soft text-sm">
+          {mode === 'first' ? (
+            <>
+              one point per species at its <span className="rust" style={{ fontWeight: 600 }}>first-found</span> location
+              {totalLocations > 0 && (
+                <>
+                  {' · '}
+                  <span className="rust font-mono" style={{ fontWeight: 600 }}>{totalLocations.toLocaleString()}</span> discovery sites
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <span className="rust font-mono" style={{ fontWeight: 600 }}>{totalLocations.toLocaleString()}</span> locations
+              {peakDiversity > 0 && (
+                <>
+                  {' · peak '}
+                  <span className="font-mono ink" style={{ fontWeight: 600 }}>{peakDiversity}</span> species at one spot
+                </>
+              )}
+            </>
+          )}
+        </p>
+      </div>
+
+      {/* Filter pills */}
+      <div className="anim-3 mb-5 flex items-center gap-2">
+        <button
+          onClick={() => setMode('all')}
+          className={`rounded-full px-4 py-1.5 text-xs transition-colors ${mode === 'all' ? 'btn-ink' : 'btn-ghost'}`}
+          aria-pressed={mode === 'all'}
+        >
+          All sightings
+        </button>
+        <button
+          onClick={() => setMode('first')}
+          disabled={!firstAvailable}
+          className={`rounded-full px-4 py-1.5 text-xs transition-colors ${mode === 'first' ? 'btn-ink' : 'btn-ghost'} ${!firstAvailable ? 'opacity-40 cursor-not-allowed' : ''}`}
+          aria-pressed={mode === 'first'}
+          title={firstAvailable ? 'Heat by first-found location of each species' : 'Re-upload your CSV to enable first-sightings'}
+        >
+          First sightings
+        </button>
+      </div>
+
+      {/* Map card */}
       <div
-        className="max-w-3xl w-full relative flex flex-col rounded-2xl overflow-hidden"
-        style={{ background: '#142926', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 30px 80px rgba(0,0,0,0.5)', maxHeight: '92vh' }}
-        onClick={(e) => e.stopPropagation()}
+        className="anim-4 rounded-2xl overflow-hidden relative"
+        style={{ background: '#142926', border: '1px solid rgba(255,255,255,0.08)' }}
       >
-        {/* header */}
-        <div className="relative p-6 sm:p-7 pb-4 border-b rule">
-          <button onClick={onClose} className="absolute top-4 right-4 ink-soft hover:ink z-10 transition-colors">
-            <X size={18} />
-          </button>
-          <div className="font-mono text-[10px] ink-faint tracking-[0.25em] uppercase mb-1">Cartography</div>
-          <h2 className="font-display ink text-2xl sm:text-3xl mb-1" style={{ fontWeight: 700 }}>Where you've found birds</h2>
-          <p className="ink-soft text-sm">
-            <span className="rust font-mono" style={{ fontWeight: 600 }}>
-              {totalLocations.toLocaleString()}
-            </span> locations
-            {peakDiversity > 0 && (
-              <>
-                {' · peak '}
-                <span className="font-mono ink" style={{ fontWeight: 600 }}>{peakDiversity}</span> species at one spot
-              </>
-            )}
-            <br />
-            <span className="ink-faint">density weighted by species variety</span>
-          </p>
-        </div>
 
         {/* map body */}
         <div className="relative flex-1 overflow-auto p-2 sm:p-4">
           {projectedCount === 0 ? (
             <div className="text-center py-12 ink-faint text-sm">
-              No locations with coordinates were found in your CSV.
+              {mode === 'first' && !firstAvailable ? (
+                <>
+                  First-sightings data isn't in storage yet — it was added in a
+                  later parser version. Re-upload your <span className="font-mono">MyEBirdData.csv</span> from
+                  Settings to enable this view. Your other data stays the same.
+                </>
+              ) : (
+                'No locations with coordinates were found in your CSV.'
+              )}
             </div>
           ) : (
             <div className="relative w-full" ref={svgContainerRef}>
@@ -3611,9 +3732,6 @@ function SightingsMapDrawer({ points, userCount, familiesSeen = 0, code3Seen = 0
             >
               {sharing ? <RefreshCw size={12} className="animate-spin" /> : <Share2 size={12} />}
               {sharing ? 'Building…' : 'Share'}
-            </button>
-            <button onClick={onClose} className="btn-ghost rounded-full px-4 py-1.5 text-xs">
-              Close
             </button>
           </div>
         </div>
