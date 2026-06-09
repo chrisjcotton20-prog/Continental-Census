@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import Papa from 'papaparse';
 import { Upload, RefreshCw, Settings, AlertCircle, Check, X, FileText, Feather, List, Search, Square, CheckSquare, Map as MapIcon, ChevronLeft, ChevronRight, Share2, Plus, Download } from 'lucide-react';
 import { storage } from './lib/storage.js';
-import { geoAlbersUsa, geoPath } from 'd3-geo';
+import { geoAlbersUsa, geoAlbers, geoPath, geoContains } from 'd3-geo';
 import { contourDensity } from 'd3-contour';
 import { feature, mesh, merge } from 'topojson-client';
 import statesTopo from 'us-atlas/states-10m.json';
@@ -1169,6 +1169,10 @@ function parseEBirdCsv(file) {
           // the user "discovered" that species. We keep date as a comparable epoch
           // number rather than parsing per-row repeatedly.
           const firstSightingByss = new Map(); // sci → {ts, lng, lat}
+          // Native species seen per region, keyed by region id (pnw, cal, ...)
+          // We read the state from the existing "State/Province" column (which
+          // we already require to be "US-XX") and look up its region.
+          const speciesByRegion = new Map();
           let earliest = null, latest = null;
           let totalObservations = 0;
 
@@ -1179,12 +1183,20 @@ function parseEBirdCsv(file) {
             const dStr = r[dateKey];
             const dt = dStr ? new Date(dStr) : null;
             const dtValid = dt && !isNaN(dt);
+            // "US-NC" → "NC" → "se". Cheap & only runs once per row.
+            const stateAbbr = (r[stateKey] || '').slice(3);
+            const regionId = STATE_TO_REGION[stateAbbr] || null;
 
             if (isCountable(sci, com)) {
               const speciesKey = sci || com;
               allSpecies.add(speciesKey);
               if (sci && NATIVE_SCI.has(sci)) {
                 nativeSci.add(sci);
+                if (regionId) {
+                  let set = speciesByRegion.get(regionId);
+                  if (!set) { set = new Set(); speciesByRegion.set(regionId, set); }
+                  set.add(sci);
+                }
               }
               const lat = parseFloat(r[latKey]);
               const lng = parseFloat(r[lngKey]);
@@ -1284,6 +1296,10 @@ function parseEBirdCsv(file) {
               locationCount: points.length,
               ebirdLocations: locationsArr.length,
               firstSightingLocations: firstSightingPoints.length,
+              // { 'pnw': 87, 'cal': 134, ... } — native species count per region
+              regionNativeCount: Object.fromEntries(
+                Array.from(speciesByRegion, ([id, set]) => [id, set.size])
+              ),
             },
           });
         } catch (e) {
@@ -1979,6 +1995,7 @@ export default function BirdLifeTracker() {
           code3Seen={code3Seen}
           atRiskSeen={atRiskSeen}
           locationCount={csvMeta?.locationCount || (points?.length ?? 0)}
+          regionNativeCount={csvMeta?.regionNativeCount || {}}
           onBack={() => setView('dashboard')}
         />
       )}
@@ -3139,6 +3156,54 @@ const NATION_BORDER = mesh(statesTopo, statesTopo.objects.states, (a, b) => a ==
 // Merged US outline as a fillable MultiPolygon (for clipPath)
 const NATION_OUTLINE = merge(statesTopo, statesTopo.objects.states.geometries);
 
+// ---------- Regional zoom ----------
+// FIPS code → 2-letter postal abbreviation. us-atlas uses FIPS codes as the
+// `id` field on each state geometry.
+const FIPS_TO_ABBR = {
+  '01':'AL','02':'AK','04':'AZ','05':'AR','06':'CA','08':'CO','09':'CT','10':'DE',
+  '11':'DC','12':'FL','13':'GA','15':'HI','16':'ID','17':'IL','18':'IN','19':'IA',
+  '20':'KS','21':'KY','22':'LA','23':'ME','24':'MD','25':'MA','26':'MI','27':'MN',
+  '28':'MS','29':'MO','30':'MT','31':'NE','32':'NV','33':'NH','34':'NJ','35':'NM',
+  '36':'NY','37':'NC','38':'ND','39':'OH','40':'OK','41':'OR','42':'PA','44':'RI',
+  '45':'SC','46':'SD','47':'TN','48':'TX','49':'UT','50':'VT','51':'VA','53':'WA',
+  '54':'WV','55':'WI','56':'WY',
+};
+const ABBR_TO_FIPS = Object.fromEntries(Object.entries(FIPS_TO_ABBR).map(([f,a]) => [a,f]));
+
+// 8-region partition of the country. Designed to honor common geographic
+// understanding (PNW, Rockies, Plains, etc.) while keeping the regions
+// reasonably balanced in birding terms. Alaska is grouped with the Pacific
+// Northwest; Hawaii rides with California because Albers USA puts both insets
+// in the lower-left of the viewBox.
+const REGIONS = [
+  { id: 'pnw', name: 'Pacific Northwest', states: ['WA','OR','ID','AK'] },
+  { id: 'cal', name: 'California',        states: ['CA','HI'] },
+  { id: 'sw',  name: 'Southwest',         states: ['AZ','NM','UT','NV'] },
+  { id: 'rm',  name: 'Rocky Mountains',   states: ['MT','WY','CO'] },
+  { id: 'gp',  name: 'Great Plains',      states: ['ND','SD','NE','KS','OK','TX'] },
+  { id: 'mw',  name: 'Midwest',           states: ['MN','IA','MO','WI','IL','MI','IN','OH'] },
+  { id: 'ne',  name: 'Northeast',         states: ['PA','NY','NJ','CT','RI','MA','VT','NH','ME','DE','MD','DC','WV'] },
+  { id: 'se',  name: 'Southeast',         states: ['AR','LA','MS','AL','GA','FL','TN','KY','NC','SC','VA'] },
+];
+const STATE_TO_REGION = {};
+for (const r of REGIONS) for (const s of r.states) STATE_TO_REGION[s] = r.id;
+const REGION_BY_ID = Object.fromEntries(REGIONS.map(r => [r.id, r]));
+
+// Pre-compute each region's merged polygon (used both as a clip outline when
+// zoomed AND for point-in-polygon filtering of heat points).
+const REGION_GEOMETRY = {};
+for (const r of REGIONS) {
+  const fipsSet = new Set(r.states.map(a => ABBR_TO_FIPS[a]).filter(Boolean));
+  const geoms = statesTopo.objects.states.geometries.filter(g => fipsSet.has(g.id));
+  REGION_GEOMETRY[r.id] = merge(statesTopo, geoms);
+}
+
+// Borders BETWEEN different regions — these get a thicker stroke on the full
+// US view so the regions read as distinct clickable areas.
+const REGION_BORDERS = mesh(statesTopo, statesTopo.objects.states, (a, b) => {
+  return STATE_TO_REGION[FIPS_TO_ABBR[a.id]] !== STATE_TO_REGION[FIPS_TO_ABBR[b.id]];
+});
+
 // Albers USA projection sized for a 700×440 viewBox
 const MAP_W = 700;
 const MAP_H = 440;
@@ -3183,6 +3248,7 @@ function SightingsMapView({
   code3Seen = 0,
   atRiskSeen = 0,
   locationCount = 0,
+  regionNativeCount = {},
   onBack,
 }) {
   const svgContainerRef = useRef(null);
@@ -3194,19 +3260,58 @@ function SightingsMapView({
   // The first-sightings view flattens the heat because repeat visits to the
   // same hotspot stop contributing once you've seen everything there.
   const [mode, setMode] = useState('all');
+  // Active region (null = full USA). When set, the projection refits to the
+  // region's geometry and the heatmap is recomputed using only points inside
+  // that region — so a Charlotte home patch can't pollute the Pacific NW view.
+  const [region, setRegion] = useState(null);
   const points = (mode === 'first' ? pointsFirst : pointsAll) || [];
   const firstAvailable = Array.isArray(pointsFirst) && pointsFirst.length > 0;
 
+  // Build the active projection. For the full USA, use the composite Albers
+  // USA (which handles Alaska/Hawaii insets). For a region, fit a plain Albers
+  // to the region's merged geometry — this gives much more detail per pixel
+  // than the country-wide view.
+  const { activeProj, activePath, activeOutline, activeName } = useMemo(() => {
+    if (!region) {
+      return {
+        activeProj: PROJECTION,
+        activePath: PATH,
+        activeOutline: NATION_OUTLINE,
+        activeName: 'United States',
+      };
+    }
+    const geo = REGION_GEOMETRY[region];
+    const meta = REGION_BY_ID[region];
+    if (!geo || !meta) {
+      return {
+        activeProj: PROJECTION, activePath: PATH,
+        activeOutline: NATION_OUTLINE, activeName: 'United States',
+      };
+    }
+    // 24-pixel padding inside the viewBox so the region's edges don't kiss
+    // the map card border.
+    const p = geoAlbers().fitExtent(
+      [[24, 24], [MAP_W - 24, MAP_H - 24]],
+      geo,
+    );
+    return { activeProj: p, activePath: geoPath(p), activeOutline: geo, activeName: meta.name };
+  }, [region]);
+
   // Project points to pixel space. Each point is [lng, lat, weight] where
-  // weight is unique species count at that location. Older data stored as
-  // [lng, lat] is handled by defaulting weight to 1.
+  // weight is unique species count at that location. When zoomed to a region,
+  // points are first filtered to those inside the region's geometry so the
+  // density contours represent only that region's data.
   const { contours, projectedCount, maxValue, totalSpeciesAcrossLocations, totalLocations } = useMemo(() => {
     const projected = [];
     let totalW = 0;
+    const regionGeo = region ? REGION_GEOMETRY[region] : null;
     for (const p of points) {
       const lng = p[0], lat = p[1];
       const w = (p.length >= 3 && Number.isFinite(p[2])) ? p[2] : 1;
-      const xy = PROJECTION([lng, lat]);
+      // Region filter: skip points outside the active region's geometry.
+      // geoContains operates in lng/lat space against the polygon.
+      if (regionGeo && !geoContains(regionGeo, [lng, lat])) continue;
+      const xy = activeProj([lng, lat]);
       if (xy && !isNaN(xy[0]) && !isNaN(xy[1])) {
         projected.push([xy[0], xy[1], w]);
         totalW += w;
@@ -3215,11 +3320,6 @@ function SightingsMapView({
     if (projected.length === 0) {
       return { contours: [], projectedCount: 0, maxValue: 0, totalSpeciesAcrossLocations: 0, totalLocations: 0 };
     }
-    // Density estimation weighted by species count per location.
-    // We sqrt-transform the weights so the gap between a 60-species home park
-    // and a 3-species memorable travel spot is compressed enough that both
-    // show up on the map. Relative ordering is preserved — bigger locations
-    // still read as brighter — just on a more humane scale.
     const dc = contourDensity()
       .x((d) => d[0])
       .y((d) => d[1])
@@ -3237,17 +3337,19 @@ function SightingsMapView({
       totalSpeciesAcrossLocations: totalW,
       totalLocations: projected.length,
     };
-  }, [points]);
+  }, [points, region, activeProj]);
 
   // Highest single-location diversity (useful in the header)
   const peakDiversity = useMemo(() => {
     let m = 0;
+    const regionGeo = region ? REGION_GEOMETRY[region] : null;
     for (const p of points) {
+      if (regionGeo && !geoContains(regionGeo, [p[0], p[1]])) continue;
       const w = (p.length >= 3 && Number.isFinite(p[2])) ? p[2] : 1;
       if (w > m) m = w;
     }
     return m;
-  }, [points]);
+  }, [points, region]);
 
   // ---- Share card: 1080×1920 portrait PNG (9:16) sized for IG/Stories ----
   async function shareCard() {
@@ -3552,38 +3654,8 @@ function SightingsMapView({
         <div className="font-mono text-[9px] ink-faint tracking-[0.2em] uppercase">Cartography</div>
       </header>
 
-      {/* Title block */}
-      <div className="anim-2 mb-3 shrink-0">
-        <h1 className="font-display ink text-2xl sm:text-3xl mb-1 leading-[1.05]" style={{ fontWeight: 700 }}>
-          {mode === 'first' ? 'Where you discovered birds' : "Where you've found birds"}
-        </h1>
-        <p className="ink-soft text-xs sm:text-sm">
-          {mode === 'first' ? (
-            <>
-              one point per species at its <span className="rust" style={{ fontWeight: 600 }}>first-found</span> location
-              {totalLocations > 0 && (
-                <>
-                  {' · '}
-                  <span className="rust font-mono" style={{ fontWeight: 600 }}>{totalLocations.toLocaleString()}</span> discovery sites
-                </>
-              )}
-            </>
-          ) : (
-            <>
-              <span className="rust font-mono" style={{ fontWeight: 600 }}>{totalLocations.toLocaleString()}</span> locations
-              {peakDiversity > 0 && (
-                <>
-                  {' · peak '}
-                  <span className="font-mono ink" style={{ fontWeight: 600 }}>{peakDiversity}</span> species at one spot
-                </>
-              )}
-            </>
-          )}
-        </p>
-      </div>
-
       {/* Filter pills */}
-      <div className="anim-3 mb-3 flex items-center gap-2 shrink-0">
+      <div className="anim-2 mb-3 flex items-center gap-2 shrink-0">
         <button
           onClick={() => setMode('all')}
           className={`rounded-full px-4 py-1.5 text-xs transition-colors ${mode === 'all' ? 'btn-ink' : 'btn-ghost'}`}
@@ -3609,16 +3681,81 @@ function SightingsMapView({
       >
 
         {/* map body — flex-1 itself so the SVG fills whatever space is left
-            inside the card after the share footer is accounted for. */}
-        <div className="relative flex-1 min-h-0 overflow-hidden p-2 sm:p-4 flex flex-col">
-          {projectedCount === 0 ? (
-            <div className="text-center py-12 ink-faint text-sm">
-              {mode === 'first' && !firstAvailable ? (
+            inside the card after the counter and share footer are accounted
+            for. */}
+        <div className="relative flex-1 min-h-0 overflow-hidden p-4 sm:p-5 flex flex-col">
+          {/* Counter — sits inside the card top, using the empty space that
+              would otherwise exist above the (aspect-locked) US map. Includes
+              the scope label and a "← USA" pill when zoomed into a region. */}
+          <div className="shrink-0 mb-2">
+            <div className="font-mono text-[9px] sm:text-[10px] ink-faint tracking-[0.25em] uppercase mb-1.5 flex items-center gap-2 flex-wrap">
+              <span>Native species</span>
+              <span className="ink-faint">·</span>
+              <span className="rust" style={{ fontWeight: 600 }}>{activeName}</span>
+              {region && (
+                <button
+                  onClick={() => setRegion(null)}
+                  className="btn-ghost rounded-full px-2 py-0.5 inline-flex items-center gap-1 ml-1"
+                  style={{ fontSize: '8.5px', letterSpacing: '0.15em' }}
+                  aria-label="Zoom out to USA"
+                >
+                  <ChevronLeft size={10} strokeWidth={2.25} />
+                  USA
+                </button>
+              )}
+            </div>
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <div
+                className="font-display ink leading-none"
+                style={{ fontWeight: 800, fontSize: 'clamp(2.25rem, 8vw, 3.25rem)' }}
+              >
+                {region ? (regionNativeCount[region] ?? 0) : (userCount ?? 0)}
+              </div>
+              <div
+                className="font-display ink-faint leading-none"
+                style={{ fontWeight: 500, fontSize: 'clamp(0.9rem, 3vw, 1.25rem)' }}
+              >
+                / {TOTAL}
+              </div>
+            </div>
+            <p className="ink-soft text-[11px] sm:text-xs mt-1.5">
+              {mode === 'first' ? (
                 <>
+                  {totalLocations > 0 ? (
+                    <>
+                      <span className="rust font-mono" style={{ fontWeight: 600 }}>{totalLocations.toLocaleString()}</span> first-found
+                      location{totalLocations === 1 ? '' : 's'}
+                    </>
+                  ) : 'no first-found locations in scope'}
+                  {!region && ' · tap a region to zoom in'}
+                </>
+              ) : (
+                <>
+                  {totalLocations > 0 ? (
+                    <>
+                      <span className="rust font-mono" style={{ fontWeight: 600 }}>{totalLocations.toLocaleString()}</span> location{totalLocations === 1 ? '' : 's'}
+                      {peakDiversity > 0 && (
+                        <>
+                          {' · peak '}
+                          <span className="font-mono ink" style={{ fontWeight: 600 }}>{peakDiversity}</span> at one spot
+                        </>
+                      )}
+                    </>
+                  ) : 'no locations in scope'}
+                  {!region && ' · tap a region to zoom in'}
+                </>
+              )}
+            </p>
+          </div>
+
+          {projectedCount === 0 ? (
+            <div className="flex-1 min-h-0 flex items-center justify-center text-center ink-faint text-sm px-4">
+              {mode === 'first' && !firstAvailable ? (
+                <span>
                   First-sightings data isn't in storage yet — it was added in a
                   later parser version. Re-upload your <span className="font-mono">MyEBirdData.csv</span> from
                   Settings to enable this view. Your other data stays the same.
-                </>
+                </span>
               ) : (
                 'No locations with coordinates were found in your CSV.'
               )}
@@ -3635,18 +3772,18 @@ function SightingsMapView({
                 >
                 <defs>
                   {/* A *dilated* clip for the heatmap. With a strict clipPath
-                      tied to the literal US outline, coastal hotspots get
-                      their gaussian blobs sliced off at the coastline — and
-                      thin barrier-island spots like the Outer Banks barely
-                      render at all because the blob is mostly out over water.
-                      Using a mask with a stroked + filled path lets the heat
-                      bleed roughly 15 user-units past the coast (≈ 3× the
-                      density bandwidth, so we keep the meaningful part of each
-                      blob while still containing the map to "near the US"). */}
+                      tied to the literal outline, coastal hotspots get their
+                      gaussian blobs sliced off at the coastline — and thin
+                      barrier-island spots like the Outer Banks barely render
+                      at all because the blob is mostly out over water. Using a
+                      mask with a stroked + filled path lets the heat bleed
+                      roughly 15 user-units past the coast. The mask outline is
+                      `activeOutline` so it tracks the current zoom scope —
+                      USA when full, region polygon when zoomed. */}
                   <mask id="us-mask" maskUnits="userSpaceOnUse" x={0} y={0} width={MAP_W} height={MAP_H}>
                     <rect x={0} y={0} width={MAP_W} height={MAP_H} fill="black" />
                     <path
-                      d={PATH(NATION_OUTLINE) || ''}
+                      d={activePath(activeOutline) || ''}
                       fill="white"
                       stroke="white"
                       strokeWidth={30}
@@ -3656,20 +3793,32 @@ function SightingsMapView({
                   </mask>
                 </defs>
 
-                {/* State fills — subtle white overlay on dark */}
+                {/* State fills. When zoomed to a region, states outside the
+                    region get a much fainter fill so the region reads as the
+                    focal area but neighbors remain as visual context.
+                    On the full US view, every state is clickable to zoom
+                    into its region. */}
                 <g>
-                  {STATES.features.map((s) => (
-                    <path
-                      key={s.id}
-                      d={PATH(s) || ''}
-                      fill="rgba(255,255,255,0.03)"
-                      stroke="none"
-                    />
-                  ))}
+                  {STATES.features.map((s) => {
+                    const abbr = FIPS_TO_ABBR[s.id];
+                    const rid = STATE_TO_REGION[abbr];
+                    const inActive = !region || rid === region;
+                    const clickable = !region && !!rid;
+                    return (
+                      <path
+                        key={s.id}
+                        d={activePath(s) || ''}
+                        fill={inActive ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.012)'}
+                        stroke="none"
+                        onClick={clickable ? () => setRegion(rid) : undefined}
+                        style={{ cursor: clickable ? 'pointer' : 'default' }}
+                      />
+                    );
+                  })}
                 </g>
 
-                {/* Heatmap contours, masked to a *dilated* country outline so
-                    coastal and barrier-island hotspots remain visible. */}
+                {/* Heatmap contours, masked to a *dilated* outline so coastal
+                    and barrier-island hotspots remain visible. */}
                 <g mask="url(#us-mask)">
                   {contours.map((c, i) => (
                     <path
@@ -3683,20 +3832,36 @@ function SightingsMapView({
 
                 {/* Internal state borders on top of heatmap */}
                 <path
-                  d={PATH(STATE_BORDERS) || ''}
+                  d={activePath(STATE_BORDERS) || ''}
                   fill="none"
                   stroke="rgba(255,255,255,0.18)"
                   strokeWidth={0.5}
                   strokeLinejoin="round"
+                  pointerEvents="none"
                 />
 
-                {/* Outer national border */}
+                {/* Region division borders — only on the full US view; thicker
+                    line so the 8 regions read as distinct tap-targets. */}
+                {!region && (
+                  <path
+                    d={activePath(REGION_BORDERS) || ''}
+                    fill="none"
+                    stroke="rgba(251,146,60,0.35)"
+                    strokeWidth={1.4}
+                    strokeLinejoin="round"
+                    pointerEvents="none"
+                  />
+                )}
+
+                {/* Outer border for the active scope. On full US that's the
+                    national outline; on a region, the region's own boundary. */}
                 <path
-                  d={PATH(NATION_BORDER) || ''}
+                  d={activePath(activeOutline) || ''}
                   fill="none"
-                  stroke="rgba(255,255,255,0.35)"
-                  strokeWidth={0.9}
+                  stroke="rgba(255,255,255,0.4)"
+                  strokeWidth={1}
                   strokeLinejoin="round"
+                  pointerEvents="none"
                 />
               </svg>
               </div>
