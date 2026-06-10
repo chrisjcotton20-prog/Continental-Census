@@ -3292,6 +3292,28 @@ const PATH = geoPath(PROJECTION);
 // are already in screen pixels.
 const PIXEL_PATH = geoPath();
 
+// Per-region projection factories.
+//
+// Plain geoAlbers() carries the defaults tuned for the conterminous US:
+// standard parallels at 29.5°N and 45.5°N, central meridian rotated to 96°W.
+// When you then fitExtent() it onto Alaska's ~52–71°N range or Hawaii's
+// ~19–22°N range, the conic fan is the wrong shape for those latitudes and
+// you get the skew you'd see if you tried to flatten a globe from the
+// perspective of someone standing over Kansas.
+//
+// The fix is the same one d3.geoAlbersUsa uses internally for its AK/HI
+// composite insets: give each region its own conic with parallels that
+// bracket the region's actual latitude range and a rotation that puts the
+// region's central longitude on the projection's central meridian. These
+// magic numbers match d3-composite-projections' Albers presets.
+//
+// For every other region the lower-48 defaults are close enough; only AK and
+// HI sit far enough from those parallels for the distortion to be visible.
+const REGION_PROJ_FN = {
+  ak: () => geoAlbers().rotate([154, 0]).center([-2, 58.5]).parallels([55, 65]),
+  hi: () => geoAlbers().rotate([157, 0]).center([-3, 19.9]).parallels([8, 18]),
+};
+
 // Warm sequential color scale: transparent → bright peach red.
 // `t` in [0, 1]. The lowest stop is fully transparent so the outer fringe of
 // each hotspot fades naturally into the map background instead of stopping at
@@ -3369,8 +3391,11 @@ function SightingsMapView({
       };
     }
     // 24-pixel padding inside the viewBox so the region's edges don't kiss
-    // the map card border.
-    const p = geoAlbers().fitExtent(
+    // the map card border. Use a region-specific projection factory when
+    // one is registered (currently AK and HI, which need their own conic
+    // parameters); fall back to plain geoAlbers for everywhere else.
+    const projFactory = REGION_PROJ_FN[region] || (() => geoAlbers());
+    const p = projFactory().fitExtent(
       [[24, 24], [MAP_W - 24, MAP_H - 24]],
       geo,
     );
