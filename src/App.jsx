@@ -1996,6 +1996,7 @@ export default function BirdLifeTracker() {
           atRiskSeen={atRiskSeen}
           locationCount={csvMeta?.locationCount || (points?.length ?? 0)}
           regionNativeCount={csvMeta?.regionNativeCount || {}}
+          locations={locations || []}
           onBack={() => setView('dashboard')}
         />
       )}
@@ -3170,14 +3171,16 @@ const FIPS_TO_ABBR = {
 };
 const ABBR_TO_FIPS = Object.fromEntries(Object.entries(FIPS_TO_ABBR).map(([f,a]) => [a,f]));
 
-// 8-region partition of the country. Designed to honor common geographic
+// 9-region partition of the country. Designed to honor common geographic
 // understanding (PNW, Rockies, Plains, etc.) while keeping the regions
-// reasonably balanced in birding terms. Alaska is grouped with the Pacific
-// Northwest; Hawaii rides with California because Albers USA puts both insets
-// in the lower-left of the viewBox.
+// reasonably balanced. Alaska is its own region because including it with
+// PNW forces an enormous bounding box that shrinks the contiguous Pacific
+// states to invisibility. Hawaii rides with California since Albers USA puts
+// it in the lower-left inset near California.
 const REGIONS = [
-  { id: 'pnw', name: 'Pacific Northwest', states: ['WA','OR','ID','AK'] },
+  { id: 'pnw', name: 'Pacific Northwest', states: ['WA','OR','ID'] },
   { id: 'cal', name: 'California',        states: ['CA','HI'] },
+  { id: 'ak',  name: 'Alaska',            states: ['AK'] },
   { id: 'sw',  name: 'Southwest',         states: ['AZ','NM','UT','NV'] },
   { id: 'rm',  name: 'Rocky Mountains',   states: ['MT','WY','CO'] },
   { id: 'gp',  name: 'Great Plains',      states: ['ND','SD','NE','KS','OK','TX'] },
@@ -3249,6 +3252,7 @@ function SightingsMapView({
   atRiskSeen = 0,
   locationCount = 0,
   regionNativeCount = {},
+  locations = [],
   onBack,
 }) {
   const svgContainerRef = useRef(null);
@@ -3350,6 +3354,40 @@ function SightingsMapView({
     }
     return m;
   }, [points, region]);
+
+  // Effective native-species count per region.
+  //
+  // Preferred source: the parser's pre-computed regionNativeCount in csvMeta.
+  // This is exact because it reads every CSV row's State/Province directly.
+  //
+  // Fallback: compute on the fly from the `locations` array — each location
+  // has its native species set, so we union them into per-region sets using
+  // geoContains for assignment. This covers the case where the user uploaded
+  // their CSV under an older parser version that didn't yet emit
+  // regionNativeCount, so the regional counter shows real numbers without
+  // forcing another re-upload. Only the lng/lat → region lookup runs at
+  // mount, and only when the parser data is missing.
+  const effectiveRegionNativeCount = useMemo(() => {
+    if (regionNativeCount && Object.keys(regionNativeCount).length > 0) {
+      return regionNativeCount;
+    }
+    if (!Array.isArray(locations) || locations.length === 0) return {};
+    const sets = {};
+    for (const loc of locations) {
+      if (!loc || !Array.isArray(loc.species) || loc.species.length === 0) continue;
+      for (const r of REGIONS) {
+        const geo = REGION_GEOMETRY[r.id];
+        if (geo && geoContains(geo, [loc.lng, loc.lat])) {
+          if (!sets[r.id]) sets[r.id] = new Set();
+          for (const s of loc.species) sets[r.id].add(s);
+          break; // each location belongs to exactly one region
+        }
+      }
+    }
+    const out = {};
+    for (const [id, set] of Object.entries(sets)) out[id] = set.size;
+    return out;
+  }, [regionNativeCount, locations]);
 
   // ---- Share card: 1080×1920 portrait PNG (9:16) sized for IG/Stories ----
   async function shareCard() {
@@ -3684,11 +3722,11 @@ function SightingsMapView({
             inside the card after the counter and share footer are accounted
             for. */}
         <div className="relative flex-1 min-h-0 overflow-hidden p-4 sm:p-5 flex flex-col">
-          {/* Counter — sits inside the card top, using the empty space that
-              would otherwise exist above the (aspect-locked) US map. Includes
-              the scope label and a "← USA" pill when zoomed into a region. */}
-          <div className="shrink-0 mb-2">
-            <div className="font-mono text-[9px] sm:text-[10px] ink-faint tracking-[0.25em] uppercase mb-1.5 flex items-center gap-2 flex-wrap">
+          {/* Counter — centered & oversized, mirroring the home-page hero
+              count. Scope label + optional "← USA" pill sit above the big
+              number; locations + "tap to zoom" hint sit below. */}
+          <div className="shrink-0 mb-3 text-center">
+            <div className="font-mono text-[9px] sm:text-[10px] ink-faint tracking-[0.25em] uppercase mb-2 flex items-center justify-center gap-2 flex-wrap">
               <span>Native species</span>
               <span className="ink-faint">·</span>
               <span className="rust" style={{ fontWeight: 600 }}>{activeName}</span>
@@ -3704,21 +3742,21 @@ function SightingsMapView({
                 </button>
               )}
             </div>
-            <div className="flex items-baseline gap-2 flex-wrap">
+            <div className="flex items-baseline justify-center gap-2 flex-wrap">
               <div
                 className="font-display ink leading-none"
-                style={{ fontWeight: 800, fontSize: 'clamp(2.25rem, 8vw, 3.25rem)' }}
+                style={{ fontWeight: 800, fontSize: 'clamp(2.75rem, 10vw, 4.25rem)', letterSpacing: '-0.02em' }}
               >
-                {region ? (regionNativeCount[region] ?? 0) : (userCount ?? 0)}
+                {region ? (effectiveRegionNativeCount[region] ?? 0) : (userCount ?? 0)}
               </div>
               <div
                 className="font-display ink-faint leading-none"
-                style={{ fontWeight: 500, fontSize: 'clamp(0.9rem, 3vw, 1.25rem)' }}
+                style={{ fontWeight: 500, fontSize: 'clamp(1rem, 3.5vw, 1.5rem)' }}
               >
                 / {TOTAL}
               </div>
             </div>
-            <p className="ink-soft text-[11px] sm:text-xs mt-1.5">
+            <p className="ink-soft text-[11px] sm:text-xs mt-2">
               {mode === 'first' ? (
                 <>
                   {totalLocations > 0 ? (
@@ -3748,28 +3786,19 @@ function SightingsMapView({
             </p>
           </div>
 
-          {projectedCount === 0 ? (
-            <div className="flex-1 min-h-0 flex items-center justify-center text-center ink-faint text-sm px-4">
-              {mode === 'first' && !firstAvailable ? (
-                <span>
-                  First-sightings data isn't in storage yet — it was added in a
-                  later parser version. Re-upload your <span className="font-mono">MyEBirdData.csv</span> from
-                  Settings to enable this view. Your other data stays the same.
-                </span>
-              ) : (
-                'No locations with coordinates were found in your CSV.'
-              )}
-            </div>
-          ) : (
-            <div className="relative flex-1 min-h-0 flex flex-col w-full" ref={svgContainerRef}>
-              <div className="flex-1 min-h-0 flex items-center justify-center">
-                <svg
-                  viewBox={`0 0 ${MAP_W} ${MAP_H}`}
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="max-w-full max-h-full"
-                  preserveAspectRatio="xMidYMid meet"
-                  style={{ background: 'transparent', width: '100%', height: '100%' }}
-                >
+          {/* SVG wrapper — always rendered so that even a region with no
+              sightings still shows its outline + states. Only the contour
+              heat layer is conditional on having projected points. A small
+              centered hint floats over the map area when empty. */}
+          <div className="relative flex-1 min-h-0 flex flex-col w-full" ref={svgContainerRef}>
+            <div className="flex-1 min-h-0 flex items-center justify-center relative">
+              <svg
+                viewBox={`0 0 ${MAP_W} ${MAP_H}`}
+                xmlns="http://www.w3.org/2000/svg"
+                className="max-w-full max-h-full"
+                preserveAspectRatio="xMidYMid meet"
+                style={{ background: 'transparent', width: '100%', height: '100%' }}
+              >
                 <defs>
                   {/* A *dilated* clip for the heatmap. With a strict clipPath
                       tied to the literal outline, coastal hotspots get their
@@ -3882,8 +3911,27 @@ function SightingsMapView({
                 </svg>
                 <span className="font-mono text-[10px] ink-faint tracking-widest uppercase">Many species</span>
               </div>
+
+              {/* Empty-state overlay — sits on top of the rendered map when
+                  there are no sightings to draw contours from. Lets the
+                  user still see the region's geography so the zoom is
+                  obviously working. */}
+              {projectedCount === 0 && (
+                <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 text-center ink-faint text-xs sm:text-sm pointer-events-none">
+                  {mode === 'first' && !firstAvailable ? (
+                    <span className="inline-block bg-[#0c1f1f]/80 px-3 py-2 rounded-lg" style={{ pointerEvents: 'auto' }}>
+                      First-sightings data isn't in storage yet — re-upload your
+                      <span className="font-mono"> MyEBirdData.csv </span>
+                      from Settings to enable this view.
+                    </span>
+                  ) : (
+                    <span className="inline-block bg-[#0c1f1f]/80 px-3 py-1.5 rounded-lg">
+                      no sightings {region ? 'in this region' : 'mapped yet'}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
-          )}
         </div>
 
         {/* footer */}
