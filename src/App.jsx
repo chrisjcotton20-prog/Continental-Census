@@ -359,12 +359,12 @@ const NATIVE_SPECIES = [
   ["Red-footed Booby","Sula sula"],
   ["Northern Gannet","Morus bassanus"],
   ["Anhinga","Anhinga anhinga"],
-  ["Brandt's Cormorant","Phalacrocorax penicillatus"],
-  ["Red-faced Cormorant","Phalacrocorax urile"],
-  ["Pelagic Cormorant","Phalacrocorax pelagicus"],
+  ["Brandt's Cormorant","Urile penicillatus"],
+  ["Red-faced Cormorant","Urile urile"],
+  ["Pelagic Cormorant","Urile pelagicus"],
   ["Great Cormorant","Phalacrocorax carbo"],
-  ["Double-crested Cormorant","Phalacrocorax auritus"],
-  ["Neotropic Cormorant","Phalacrocorax brasilianus"],
+  ["Double-crested Cormorant","Nannopterum auritum"],
+  ["Neotropic Cormorant","Nannopterum brasilianum"],
   ["American White Pelican","Pelecanus erythrorhynchos"],
   ["Brown Pelican","Pelecanus occidentalis"],
   ["American Bittern","Botaurus lentiginosus"],
@@ -837,7 +837,7 @@ const FAMILY_BOUNDARIES = [
   ["Fregata magnificens","Frigatebirds"],
   ["Sula dactylatra","Boobies & Gannets"],
   ["Anhinga anhinga","Anhingas"],
-  ["Phalacrocorax penicillatus","Cormorants"],
+  ["Urile penicillatus","Cormorants"],
   ["Pelecanus erythrorhynchos","Pelicans"],
   ["Botaurus lentiginosus","Herons, Egrets & Bitterns"],
   ["Eudocimus albus","Ibises & Spoonbills"],
@@ -1173,6 +1173,13 @@ function parseEBirdCsv(file) {
           // We read the state from the existing "State/Province" column (which
           // we already require to be "US-XX") and look up its region.
           const speciesByRegion = new Map();
+          // Diagnostic: scientific names from countable rows that AREN'T in
+          // NATIVE_SCI. Most will be legitimate non-natives (introduced
+          // species, vagrant exotics) — but some may indicate AOS/Clements
+          // taxonomy updates the app's checklist hasn't caught up with, like
+          // the 2021 cormorant split (Phalacrocorax → Urile / Nannopterum).
+          // Surfacing the list lets the user (and me) spot these.
+          const unrecognized = new Map(); // sci → { sci, com, count }
           let earliest = null, latest = null;
           let totalObservations = 0;
 
@@ -1197,6 +1204,13 @@ function parseEBirdCsv(file) {
                   if (!set) { set = new Set(); speciesByRegion.set(regionId, set); }
                   set.add(sci);
                 }
+              } else if (sci) {
+                // Sci name present but not in our native checklist. Could be a
+                // legitimate exotic or a taxonomy-update miss. Bucket it for
+                // the diagnostic.
+                let entry = unrecognized.get(sci);
+                if (!entry) { entry = { sci, com: com || '', count: 0 }; unrecognized.set(sci, entry); }
+                entry.count++;
               }
               const lat = parseFloat(r[latKey]);
               const lng = parseFloat(r[lngKey]);
@@ -1300,6 +1314,12 @@ function parseEBirdCsv(file) {
               regionNativeCount: Object.fromEntries(
                 Array.from(speciesByRegion, ([id, set]) => [id, set.size])
               ),
+              // Sorted by observation count desc; top 200 only to keep meta
+              // small. The full list of unmatched sci names lets us see which
+              // species in the CSV didn't hit our native checklist.
+              unrecognizedSci: Array.from(unrecognized.values())
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 200),
             },
           });
         } catch (e) {
@@ -2152,6 +2172,52 @@ export default function BirdLifeTracker() {
             </div>
 
             <div className="border-t rule my-6" />
+
+            {/* Taxonomy diagnostic. Lists scientific names in the user's CSV
+                that we didn't recognize as native US species. Most are real
+                exotics (House Sparrow, Eurasian Collared-Dove, etc.) that are
+                correctly excluded — but the list also catches AOS/Clements
+                taxonomy updates the app hasn't absorbed yet (e.g. cormorants
+                moving from Phalacrocorax to Urile/Nannopterum in 2021). If
+                you see a recognizable native bird here, that's a bug in the
+                app's checklist worth reporting. */}
+            {Array.isArray(csvMeta?.unrecognizedSci) && csvMeta.unrecognizedSci.length > 0 && (
+              <>
+                <details className="block group">
+                  <summary className="cursor-pointer list-none flex items-center justify-between px-3 py-2 rounded-lg ink-soft hover:ink hover:bg-white/5 text-sm transition-colors">
+                    <span>
+                      <span className="rust font-mono" style={{ fontWeight: 600 }}>{csvMeta.unrecognizedSci.length}</span>
+                      {' '}unmatched species in CSV
+                    </span>
+                    <ChevronRight size={14} className="transition-transform group-open:rotate-90" />
+                  </summary>
+                  <div className="mt-2 mb-2 px-3 py-3 rounded-lg bg-black/20 text-xs leading-relaxed">
+                    <p className="ink-faint mb-3">
+                      Scientific names from your CSV that aren't on the app's
+                      native checklist. Many are correctly excluded as
+                      naturalized non-natives (House Sparrow, European Starling,
+                      etc.). Others may indicate AOS taxonomy updates the app
+                      needs — if a real native shows up here, that's a bug.
+                    </p>
+                    <div className="max-h-56 overflow-y-auto pr-1 space-y-1.5">
+                      {csvMeta.unrecognizedSci.map((u, i) => (
+                        <div key={i} className="flex items-baseline justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="ink truncate" style={{ fontWeight: 500 }}>
+                              {u.com || u.sci}
+                            </div>
+                            <div className="font-mono text-[10px] ink-faint italic truncate">{u.sci}</div>
+                          </div>
+                          <div className="font-mono text-[10px] ink-faint shrink-0">×{u.count}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </details>
+
+                <div className="border-t rule my-6" />
+              </>
+            )}
 
             <div className="flex items-center justify-between gap-3">
               <button onClick={resetAll} className="text-xs rust hover:underline">Clear all data</button>
@@ -3171,16 +3237,16 @@ const FIPS_TO_ABBR = {
 };
 const ABBR_TO_FIPS = Object.fromEntries(Object.entries(FIPS_TO_ABBR).map(([f,a]) => [a,f]));
 
-// 9-region partition of the country. Designed to honor common geographic
+// 10-region partition of the country. Designed to honor common geographic
 // understanding (PNW, Rockies, Plains, etc.) while keeping the regions
-// reasonably balanced. Alaska is its own region because including it with
-// PNW forces an enormous bounding box that shrinks the contiguous Pacific
-// states to invisibility. Hawaii rides with California since Albers USA puts
-// it in the lower-left inset near California.
+// reasonably balanced. Alaska and Hawaii are each their own region because
+// grouping them with the Pacific states forces enormous bounding boxes that
+// shrink the contiguous states to invisibility when zoomed.
 const REGIONS = [
   { id: 'pnw', name: 'Pacific Northwest', states: ['WA','OR','ID'] },
-  { id: 'cal', name: 'California',        states: ['CA','HI'] },
+  { id: 'cal', name: 'California',        states: ['CA'] },
   { id: 'ak',  name: 'Alaska',            states: ['AK'] },
+  { id: 'hi',  name: 'Hawaii',            states: ['HI'] },
   { id: 'sw',  name: 'Southwest',         states: ['AZ','NM','UT','NV'] },
   { id: 'rm',  name: 'Rocky Mountains',   states: ['MT','WY','CO'] },
   { id: 'gp',  name: 'Great Plains',      states: ['ND','SD','NE','KS','OK','TX'] },
