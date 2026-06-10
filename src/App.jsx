@@ -3439,15 +3439,27 @@ function SightingsMapView({
       };
     }
 
-    // Strategy 1: lower-48 regions get a fixed 1.3 mi/px projection.
+    // Strategy 1: lower-48 regions get a fixed 1.3 mi/px projection inside a
+    // fixed-size viewBox.
     //
-    // For an Albers projection, the .scale() value is the projection sphere's
-    // radius in pixels. 1° of latitude maps to scale * π/180 pixels, and
-    // 1° latitude is ~69 miles. So to get TARGET_MPP miles per pixel:
-    //   1 / TARGET_MPP px/mi × 69 mi/deg = scale * π/180 px/deg
-    //   → scale = 69 × (180/π) / TARGET_MPP
+    // The fixed viewBox (FIXED_VB × FIXED_VB) is sized to comfortably hold the
+    // largest region (Southeast, which needs ~839×819 at 1.3 mi/px). Smaller
+    // regions render centered inside that same canvas, with the rest of the
+    // SVG transparent so the card's dark background shows through — no white
+    // bands, no visible region boundary, just smaller-looking states sitting
+    // in the same dark map area.
+    //
+    // The point of this is proportional rendering: because every region uses
+    // the same viewBox size, the SVG always shrinks to fit the card at the
+    // same scale factor, so 1 viewBox pixel = the same on-screen pixels in
+    // every region. Combined with the fixed 1.3 mi/px viewBox scale, that
+    // means 1 real-world mile = the same number of on-screen pixels in every
+    // region. Florida looks bigger than Kansas because it IS bigger; the
+    // mismatch where small regions like Great Plains visually outgrew large
+    // ones like Southeast goes away.
     const TARGET_MPP = 1.3;
     const MI_PER_DEG_LAT = 69.0;
+    const FIXED_VB = 900;
     const k = (MI_PER_DEG_LAT / TARGET_MPP) * (180 / Math.PI);
     const centroid = geoCentroid(geo);
 
@@ -3459,21 +3471,22 @@ function SightingsMapView({
       .center([0, centroid[1]])    // visual center at centroid latitude
       .translate([0, 0]);
 
-    // Project the geometry to discover where it lands in pixel space, then
-    // size the viewBox to contain it (plus padding) and translate so it
-    // starts at (PAD, PAD).
+    // Project the geometry, then translate so the geometry's bbox CENTER
+    // lands at the viewBox center. The geometry ends up centered in the
+    // FIXED_VB square; smaller regions are surrounded by transparent
+    // space that reveals the card background.
     const bnd = geoPath(p).bounds(geo);
-    const vbW = Math.round(bnd[1][0] - bnd[0][0] + 2 * PAD);
-    const vbH = Math.round(bnd[1][1] - bnd[0][1] + 2 * PAD);
-    p = p.translate([PAD - bnd[0][0], PAD - bnd[0][1]]);
+    const geoCenterX = (bnd[0][0] + bnd[1][0]) / 2;
+    const geoCenterY = (bnd[0][1] + bnd[1][1]) / 2;
+    p = p.translate([FIXED_VB / 2 - geoCenterX, FIXED_VB / 2 - geoCenterY]);
 
     return {
       activeProj: p,
       activePath: geoPath(p),
       activeOutline: geo,
       activeName: meta.name,
-      viewBoxW: vbW,
-      viewBoxH: vbH,
+      viewBoxW: FIXED_VB,
+      viewBoxH: FIXED_VB,
     };
   }, [region]);
 
