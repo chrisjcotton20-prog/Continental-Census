@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import Papa from 'papaparse';
 import { Upload, RefreshCw, Settings, AlertCircle, Check, X, FileText, Feather, List, Search, Square, CheckSquare, Map as MapIcon, ChevronLeft, ChevronRight, Share2, Plus, Download } from 'lucide-react';
 import { storage } from './lib/storage.js';
-import { geoAlbersUsa, geoAlbers, geoPath, geoContains } from 'd3-geo';
+import { geoAlbersUsa, geoAlbers, geoPath, geoContains, geoCentroid } from 'd3-geo';
 import { contourDensity } from 'd3-contour';
 import { feature, mesh, merge } from 'topojson-client';
 import statesTopo from 'us-atlas/states-10m.json';
@@ -3374,13 +3374,23 @@ function SightingsMapView({
   const points = (mode === 'first' ? pointsFirst : pointsAll) || [];
   const firstAvailable = Array.isArray(pointsFirst) && pointsFirst.length > 0;
 
-  // Build the active projection AND a viewBox aspect that fits the active
-  // geometry. With a fixed wide viewBox (700×440), tall regions like Great
-  // Plains end up height-constrained — there's a lot of horizontal whitespace
-  // inside the viewBox AND the SVG fits-to-container with extra margin, so
-  // the map ends up tiny on screen. By matching the viewBox aspect to each
-  // region's natural projected aspect, the projection fills the viewBox AND
-  // the SVG fits its container more tightly, so the map fills more pixels.
+  // Build the active projection AND its viewBox dimensions.
+  //
+  // Two strategies for regional zoom:
+  //
+  // 1. Lower 48 regions: target a fixed 1.3 miles-per-pixel resolution at the
+  //    region's centroid. Each region's viewBox is sized to contain the
+  //    geometry at that fixed scale, so a heat blob in Charlotte and a heat
+  //    blob in Seattle represent the same real-world radius (≈ 6.5 mi for
+  //    the 5-pixel bandwidth). This makes cross-region comparison meaningful
+  //    and prevents tiny regions from over-zooming while large ones starve
+  //    for detail.
+  //
+  // 2. Alaska and Hawaii: keep the existing fit-to-viewBox behavior with
+  //    their region-specific conic params (REGION_PROJ_FN). AK and HI are
+  //    each one state with very specific geometry that needs custom handling,
+  //    and a fixed 1.3 mi/px target would either make AK enormous (it's the
+  //    size of two and a half Texases) or HI tiny.
   const { activeProj, activePath, activeOutline, activeName, viewBoxW, viewBoxH } = useMemo(() => {
     if (!region) {
       return {
@@ -3401,40 +3411,62 @@ function SightingsMapView({
         viewBoxW: MAP_W, viewBoxH: MAP_H,
       };
     }
-    // Step 1: build the appropriate projection factory. AK and HI need
-    // custom conic parameters; everywhere else is plain geoAlbers.
-    const projFactory = REGION_PROJ_FN[region] || (() => geoAlbers());
+    const PAD = 8;
 
-    // Step 2: trial projection at default scale/translate to discover the
-    // geometry's natural projected aspect. The absolute bounds don't matter
-    // here — only the ratio of width to height of the projected shape.
-    const trial = projFactory();
-    const trialBounds = geoPath(trial).bounds(geo);
-    const trialW = trialBounds[1][0] - trialBounds[0][0];
-    const trialH = trialBounds[1][1] - trialBounds[0][1];
-    const aspect = trialW / trialH; // wider regions → > 1, taller → < 1
-
-    // Step 3: pick a viewBox that matches the natural aspect. Keep the long
-    // axis at LONG_DIM and let the short axis scale. Clamp the short axis so
-    // we don't produce ridiculously thin viewBoxes for outlier shapes.
-    const LONG_DIM = 700;
-    const MIN_SHORT_DIM = 280;
-    let vbW, vbH;
-    if (aspect >= 1) {
-      vbW = LONG_DIM;
-      vbH = Math.max(MIN_SHORT_DIM, Math.round(LONG_DIM / aspect));
-    } else {
-      vbH = LONG_DIM;
-      vbW = Math.max(MIN_SHORT_DIM, Math.round(LONG_DIM * aspect));
+    // Strategy 2: AK and HI use their custom conic factories with fit-to-viewBox.
+    if (REGION_PROJ_FN[region]) {
+      const projFactory = REGION_PROJ_FN[region];
+      const trial = projFactory();
+      const trialBounds = geoPath(trial).bounds(geo);
+      const trialW = trialBounds[1][0] - trialBounds[0][0];
+      const trialH = trialBounds[1][1] - trialBounds[0][1];
+      const aspect = trialW / trialH;
+      const LONG_DIM = 700, MIN_SHORT_DIM = 280;
+      let vbW, vbH;
+      if (aspect >= 1) {
+        vbW = LONG_DIM; vbH = Math.max(MIN_SHORT_DIM, Math.round(LONG_DIM / aspect));
+      } else {
+        vbH = LONG_DIM; vbW = Math.max(MIN_SHORT_DIM, Math.round(LONG_DIM * aspect));
+      }
+      const p = projFactory().fitExtent(
+        [[PAD, PAD], [vbW - PAD, vbH - PAD]],
+        geo,
+      );
+      return {
+        activeProj: p, activePath: geoPath(p),
+        activeOutline: geo, activeName: meta.name,
+        viewBoxW: vbW, viewBoxH: vbH,
+      };
     }
 
-    // Step 4: small inner padding (8px instead of 24) so the geometry kisses
-    // the viewBox edges, squeezing out a bit more zoom.
-    const PAD = 8;
-    const p = projFactory().fitExtent(
-      [[PAD, PAD], [vbW - PAD, vbH - PAD]],
-      geo,
-    );
+    // Strategy 1: lower-48 regions get a fixed 1.3 mi/px projection.
+    //
+    // For an Albers projection, the .scale() value is the projection sphere's
+    // radius in pixels. 1° of latitude maps to scale * π/180 pixels, and
+    // 1° latitude is ~69 miles. So to get TARGET_MPP miles per pixel:
+    //   1 / TARGET_MPP px/mi × 69 mi/deg = scale * π/180 px/deg
+    //   → scale = 69 × (180/π) / TARGET_MPP
+    const TARGET_MPP = 1.3;
+    const MI_PER_DEG_LAT = 69.0;
+    const k = (MI_PER_DEG_LAT / TARGET_MPP) * (180 / Math.PI);
+    const centroid = geoCentroid(geo);
+
+    // Center the projection on the region's centroid so distortion is
+    // minimized there (the spot we're measuring mi/px against).
+    let p = geoAlbers()
+      .scale(k)
+      .rotate([-centroid[0], 0])  // central meridian at centroid longitude
+      .center([0, centroid[1]])    // visual center at centroid latitude
+      .translate([0, 0]);
+
+    // Project the geometry to discover where it lands in pixel space, then
+    // size the viewBox to contain it (plus padding) and translate so it
+    // starts at (PAD, PAD).
+    const bnd = geoPath(p).bounds(geo);
+    const vbW = Math.round(bnd[1][0] - bnd[0][0] + 2 * PAD);
+    const vbH = Math.round(bnd[1][1] - bnd[0][1] + 2 * PAD);
+    p = p.translate([PAD - bnd[0][0], PAD - bnd[0][1]]);
+
     return {
       activeProj: p,
       activePath: geoPath(p),
