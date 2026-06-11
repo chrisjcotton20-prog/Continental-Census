@@ -2,7 +2,7 @@
 // Mimics the get/set/delete interface of window.storage used in the artifact,
 // so the rest of the app doesn't need to know about IDB.
 
-const DB_NAME = 'continental-census';
+const DB_NAME = 'birder';
 const DB_VERSION = 1;
 const STORE = 'kv';
 

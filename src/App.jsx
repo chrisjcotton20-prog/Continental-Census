@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import Papa from 'papaparse';
 import { Upload, RefreshCw, Settings, AlertCircle, Check, X, FileText, Feather, List, Search, Square, CheckSquare, Map as MapIcon, ChevronLeft, ChevronRight, Share2, Plus, Download } from 'lucide-react';
 import { storage } from './lib/storage.js';
+import { BluebirdMascot, Cardinal, Cloud, Sparkle, Compass, TreeIcon, HeartIcon, EyeIcon, CalendarIcon, BinocularsIcon } from './Illustrations.jsx';
 import { geoAlbersUsa, geoAlbers, geoPath, geoContains, geoCentroid } from 'd3-geo';
 import { contourDensity } from 'd3-contour';
 import { feature, mesh, merge } from 'topojson-client';
@@ -1665,38 +1666,61 @@ export default function BirdLifeTracker() {
   const empty = hydrated && userCount == null;
 
   return (
-    <div className="font-body min-h-screen w-full relative overflow-hidden" style={{
-      background: '#0c1f1f',
-      color: '#f5f5f4',
+    <div className="font-body min-h-screen w-full relative" style={{
+      // Sky gradient — sits behind the app content
+      background: 'linear-gradient(180deg, #6cb8e4 0%, #a8d8eb 40%, #f8d9a8 100%)',
+      backgroundAttachment: 'fixed',
+      color: '#2a3445',
     }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        /* ===========================================================
+           Birdfolk visual tokens — chunky pastel Animal Crossing vibe.
+           Replaces the old dark-teal field-guide tokens. All component
+           classes referenced by name throughout App.jsx are redefined
+           here so the look pivots without churning every className.
+           =========================================================== */
 
-        /* Typography */
-        .font-display { font-family: 'Montserrat', system-ui, sans-serif; letter-spacing: -0.025em; font-feature-settings: 'tnum' 1; }
-        .font-body { font-family: 'Montserrat', system-ui, sans-serif; }
+        /* Typography — Fredoka for display headlines, Nunito for body,
+           JetBrains Mono retained for technical numerics. */
+        .font-display { font-family: 'Fredoka', system-ui, sans-serif; font-weight: 600; letter-spacing: 0; font-feature-settings: 'tnum' 1; }
+        .font-body { font-family: 'Nunito', system-ui, sans-serif; }
         .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-feature-settings: 'tnum' 1; }
 
-        /* Text colors */
-        .ink { color: #f5f5f4; }
-        .ink-soft { color: #a8b1ae; }
-        .ink-faint { color: #6b7773; }
+        /* Text colors — darker ink on cream paper */
+        .ink { color: #2a3445; }
+        .ink-soft { color: #5a4a3e; }
+        .ink-faint { color: #7a6a55; }
 
-        /* Accents (punchier) */
-        .rust { color: #fb923c; }        /* warm orange — primary brand */
-        .moss { color: #4ade80; }        /* emerald — seen/found indicator */
-        .teal { color: #2dd4bf; }        /* secondary accent */
+        /* Accents — high-saturation cute palette.
+           'rust' stays the name for backwards compatibility but now points
+           to coral. 'moss' goes to mint, 'teal' goes to sky blue. */
+        .rust { color: #ff6b6b; }
+        .moss { color: #5cba87; }
+        .teal { color: #5fa8d3; }
 
-        /* Surfaces */
-        .surface-1 { background: #142926; border: 1px solid rgba(255,255,255,0.06); }
-        .surface-2 { background: #1c3531; border: 1px solid rgba(255,255,255,0.08); }
-        .grain { /* parchment texture retired */ }
+        /* Surfaces — chunky white cards with dark borders + offset shadows.
+           This is the Animal Crossing "3D button" look applied to all card
+           surfaces. surface-1 is the default white card; surface-2 is the
+           slightly warmer cream card used for emphasis areas. */
+        .surface-1 {
+          background: #fff;
+          border: 2.5px solid #2a3445;
+          box-shadow: 0 4px 0 0 #2a3445;
+          border-radius: 18px;
+        }
+        .surface-2 {
+          background: #fff8e8;
+          border: 2.5px solid #2a3445;
+          box-shadow: 0 4px 0 0 #2a3445;
+          border-radius: 18px;
+        }
+        .grain { /* retired — chunky shadows do the heavy lifting now */ }
 
         /* Rules / dividers */
-        .rule { border-color: rgba(255,255,255,0.10); }
-        .rule-dashed { background-image: linear-gradient(to right, rgba(255,255,255,0.20) 50%, transparent 50%); background-size: 8px 1px; background-repeat: repeat-x; height: 1px; }
+        .rule { border-color: rgba(42,52,69,0.18); }
+        .rule-dashed { background-image: linear-gradient(to right, rgba(42,52,69,0.25) 50%, transparent 50%); background-size: 8px 1px; background-repeat: repeat-x; height: 1px; }
 
-        /* Animations */
+        /* Animations — kept identical to old app for entrance choreography */
         @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .anim-1 { animation: fadeUp 0.5s 0.05s both ease-out; }
@@ -1706,66 +1730,157 @@ export default function BirdLifeTracker() {
         .anim-5 { animation: fadeUp 0.5s 0.45s both ease-out; }
         .toast { animation: fadeIn 0.25s ease-out; }
 
-        /* Pill / chip — was the rust 'stamp' */
+        /* Stamp pill — small badge on the empty state etc. Now reads like
+           a Nintendo-style "New!" badge in coral. */
         .stamp {
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          padding: 6px 14px;
-          background: rgba(249, 115, 22, 0.10);
-          color: #fb923c;
-          font-family: 'Montserrat', system-ui, sans-serif;
-          font-weight: 600;
+          padding: 5px 14px;
+          background: #ff6b6b;
+          color: #fff;
+          font-family: 'Fredoka', system-ui, sans-serif;
+          font-weight: 700;
           font-size: 11px;
-          letter-spacing: 0.12em;
+          letter-spacing: 0.1em;
           text-transform: uppercase;
-          border: 1px solid rgba(249, 115, 22, 0.25);
+          border: 2.5px solid #a83a3a;
+          box-shadow: 0 2px 0 0 #a83a3a;
+          text-shadow: 0 1px 0 #a83a3a;
           border-radius: 999px;
         }
 
-        /* Buttons */
-        .btn-ink { background: #f97316; color: #0c1f1f; font-weight: 600; transition: all 0.15s; }
-        .btn-ink:hover { background: #fb923c; transform: translateY(-1px); }
-        .btn-ink:disabled { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.4); cursor: not-allowed; transform: none; }
-        .btn-ghost { background: rgba(255,255,255,0.04); color: #f5f5f4; border: 1px solid rgba(255,255,255,0.15); font-weight: 500; transition: all 0.15s; }
-        .btn-ghost:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.30); }
-        .btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+        /* Buttons — chunky pills with offset shadows */
+        .btn-ink {
+          background: #ff6b6b;
+          color: #fff;
+          font-family: 'Fredoka', system-ui, sans-serif;
+          font-weight: 700;
+          border: 2.5px solid #a83a3a;
+          box-shadow: 0 3px 0 0 #a83a3a;
+          text-shadow: 0 1.5px 0 #a83a3a;
+          letter-spacing: 0.02em;
+          transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .btn-ink:hover { transform: translateY(-1px); box-shadow: 0 4px 0 0 #a83a3a; }
+        .btn-ink:active { transform: translateY(2px); box-shadow: 0 1px 0 0 #a83a3a; }
+        .btn-ink:disabled { background: rgba(0,0,0,0.08); color: rgba(0,0,0,0.4); border-color: rgba(0,0,0,0.15); box-shadow: 0 3px 0 0 rgba(0,0,0,0.15); text-shadow: none; cursor: not-allowed; transform: none; }
 
-        /* Inputs */
-        .input-field { background: rgba(0,0,0,0.20); border: 1px solid rgba(255,255,255,0.12); color: #f5f5f4; }
-        .input-field::placeholder { color: #6b7773; }
-        .input-field:focus { outline: none; border-color: #f97316; box-shadow: 0 0 0 3px rgba(249,115,22,0.15); }
+        .btn-ghost {
+          background: #fff;
+          color: #2a3445;
+          font-family: 'Fredoka', system-ui, sans-serif;
+          font-weight: 600;
+          border: 2.5px solid #2a3445;
+          box-shadow: 0 3px 0 0 #2a3445;
+          transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .btn-ghost:hover { transform: translateY(-1px); box-shadow: 0 4px 0 0 #2a3445; }
+        .btn-ghost:active { transform: translateY(2px); box-shadow: 0 1px 0 0 #2a3445; }
+        .btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
-        /* Lists */
+        /* Inputs — friendly rounded with thick dark borders */
+        .input-field {
+          background: #fff;
+          border: 2.5px solid #2a3445;
+          color: #2a3445;
+          border-radius: 12px;
+          font-family: 'Nunito', system-ui, sans-serif;
+          font-weight: 500;
+        }
+        .input-field::placeholder { color: #9a8a75; }
+        .input-field:focus { outline: none; box-shadow: 0 0 0 3px rgba(255,107,107,0.25); }
+
+        /* Lists / rows */
         .species-row { transition: background 0.12s; }
-        .species-row:hover { background: rgba(255,255,255,0.04); }
+        .species-row:hover { background: rgba(255,224,102,0.18); }
 
-        /* Subtle hover lift on cards */
-        .lift { transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s; }
-        .lift:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.18); }
+        /* Card lift hover */
+        .lift { transition: transform 0.12s, box-shadow 0.12s; }
+        .lift:hover { transform: translateY(-2px); }
       `}</style>
 
       {view === 'dashboard' && (
-      <div className="relative max-w-3xl mx-auto px-6 sm:px-10 py-8 sm:py-12">
-        <header className="anim-1 flex items-center justify-between mb-10 sm:mb-14">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(249,115,22,0.15)' }}>
-              <Feather size={16} strokeWidth={2} className="rust" />
+      <div className="relative max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {/* ===== Chunky sky banner header =====
+            Sits at the top of every dashboard view. Sky-blue gradient with a
+            thick dark border + offset shadow (signature AC button look). The
+            bluebird mascot sits on the left, brand on the right of it, and
+            the settings cog floats on the right as a chunky white circle.
+            Decorative clouds drift in the background. */}
+        <header
+          className="anim-1 relative overflow-hidden rounded-3xl mb-5"
+          style={{
+            background: 'linear-gradient(135deg, #7cc4e8 0%, #a8dff5 60%, #c5e8ff 100%)',
+            border: '3px solid #2a5680',
+            boxShadow: '0 5px 0 0 #2a5680',
+            padding: '14px 16px 16px',
+          }}
+        >
+          <div className="absolute top-1.5 right-16 pointer-events-none"><Cloud size={48} opacity={0.85} /></div>
+          <div className="absolute top-7 right-32 pointer-events-none"><Cloud size={32} opacity={0.7} /></div>
+          <div className="relative flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <BluebirdMascot size={52} className="flex-shrink-0 drop-shadow-md" />
+              <div>
+                <h1
+                  className="font-display leading-none"
+                  style={{
+                    fontWeight: 700,
+                    fontSize: '24px',
+                    letterSpacing: '-0.01em',
+                    color: '#fff',
+                    textShadow: '0 2px 0 #2a5680, 0 3px 4px rgba(42,52,69,0.25)',
+                  }}
+                >
+                  Birder
+                </h1>
+                <p
+                  className="font-sans mt-1"
+                  style={{
+                    fontWeight: 700,
+                    fontSize: '10px',
+                    color: '#fff',
+                    opacity: 0.92,
+                    letterSpacing: '0.08em',
+                    textShadow: '0 1px 0 #2a5680',
+                  }}
+                >
+                  YOUR LIFE LIST, MADE CUTE
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="font-display text-base sm:text-lg ink leading-none" style={{ fontWeight: 700, letterSpacing: '0.02em' }}>
-                CENSUS
-              </h1>
-              <p className="font-mono text-[9px] ink-faint tracking-[0.2em] uppercase mt-1">United States</p>
-            </div>
+            <button
+              onClick={() => setShowSettings(true)}
+              aria-label="Settings"
+              className="flex items-center justify-center flex-shrink-0"
+              style={{
+                width: 38, height: 38, borderRadius: '50%',
+                background: '#fff', border: '2.5px solid #2a5680',
+                boxShadow: '0 3px 0 0 #2a5680',
+                color: '#2a5680',
+              }}
+            >
+              <Settings size={18} strokeWidth={2.5} />
+            </button>
           </div>
-          <button
-            onClick={() => setShowSettings(true)}
-            className="btn-ghost rounded-full p-2.5"
-            aria-label="Settings"
-          >
-            <Settings size={16} strokeWidth={2} />
-          </button>
+
+          {/* Friendly greeting strip — only when we have data */}
+          {!empty && hydrated && csvMeta?.latest && (
+            <div
+              className="relative mt-3 flex items-center gap-2 px-3 py-2"
+              style={{
+                background: 'rgba(255,255,255,0.55)',
+                border: '2px solid #2a5680',
+                borderRadius: 12,
+              }}
+            >
+              <Sparkle size={18} className="flex-shrink-0" />
+              <p className="font-display text-xs sm:text-sm" style={{ fontWeight: 500, color: '#2a5680' }}>
+                Hey! Latest entry was {fmtDate(csvMeta.latest)}.
+              </p>
+            </div>
+          )}
         </header>
 
         {empty && (
@@ -1819,7 +1934,7 @@ export default function BirdLifeTracker() {
                   className="btn-ghost rounded-full px-5 py-2 text-xs inline-flex items-center gap-2"
                 >
                   <Plus size={14} strokeWidth={2.5} />
-                  Add CENSUS to your home screen
+                  Add Birder to your home screen
                 </button>
               </div>
             )}
@@ -1840,128 +1955,311 @@ export default function BirdLifeTracker() {
 
         {!empty && hydrated && (
           <main>
-            <div className="text-center mb-3 anim-2">
-              <div className="font-mono text-[10px] ink-faint tracking-[0.3em] uppercase">Native Life List</div>
-            </div>
-
-            <div className="text-center mb-2 anim-2">
+            {/* ===== Hero count card =====
+                A chunky white card containing the big "Life List" label pill,
+                the dramatic coral hero number with offset text-shadow (the
+                signature Animal Crossing menu-title look), the denominator,
+                and an inline progress bar with a rainbow fill.
+                ===== */}
+            <div
+              className="anim-2 mb-5 relative"
+              style={{
+                background: 'linear-gradient(180deg, #fff 0%, #fff8e8 100%)',
+                border: '3px solid #2a3445',
+                boxShadow: '0 5px 0 0 #2a3445',
+                borderRadius: 22,
+                padding: '18px 20px 16px',
+                textAlign: 'center',
+              }}
+            >
+              {/* Star badge popping out of the top-right corner */}
               <div
-                className="font-display ink leading-none"
-                style={{ fontSize: 'clamp(6.5rem, 20vw, 11rem)', fontWeight: 800, letterSpacing: '-0.04em' }}
+                className="absolute"
+                style={{
+                  top: -10, right: 18, width: 28, height: 28,
+                  background: '#ffe066',
+                  border: '2.5px solid #c9a01a',
+                  borderRadius: '50%',
+                  boxShadow: '0 3px 0 0 #c9a01a',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#c9a01a', fontWeight: 900, fontSize: 16,
+                  lineHeight: 1,
+                }}
               >
-                {userCount != null ? fmt(userCount) : '—'}
+                ★
               </div>
-            </div>
 
-            <div className="text-center mb-10 anim-3">
-              <span className="font-display ink-soft" style={{ fontSize: '1rem', fontWeight: 500, letterSpacing: '0.02em' }}>
-                of {fmt(TOTAL)} species
-              </span>
-            </div>
-
-            <div className="mb-3 anim-4">
-              <div className="flex items-baseline justify-between mb-2.5">
-                <span className="font-display rust" style={{ fontSize: '1.5rem', fontWeight: 700 }}>
-                  {pct != null ? `${pct.toFixed(1)}%` : '—'}
-                </span>
-                <span className="text-xs ink-soft font-mono">
-                  {remaining != null ? `${fmt(remaining)} to go` : ''}
-                </span>
-              </div>
-              <div className="relative h-2 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                <div
-                  className="absolute inset-y-0 left-0 rounded-full"
+              {/* "Life List" pill */}
+              <div className="inline-flex" style={{ marginBottom: 10 }}>
+                <span
+                  className="font-display"
                   style={{
-                    width: `${progressAnim * 100}%`,
-                    background: 'linear-gradient(90deg, #f97316 0%, #fb923c 100%)',
-                    boxShadow: '0 0 12px rgba(249,115,22,0.4)',
+                    background: '#5fa8d3', color: '#fff',
+                    fontWeight: 700, fontSize: 11,
+                    letterSpacing: '0.1em', textTransform: 'uppercase',
+                    padding: '5px 14px', borderRadius: 999,
+                    border: '2px solid #2a5680',
+                    boxShadow: '0 2px 0 0 #2a5680',
+                    textShadow: '0 1px 0 #2a5680',
+                  }}
+                >
+                  Life List
+                </span>
+              </div>
+
+              {/* The big coral 204 with offset text-shadow */}
+              <div className="flex items-baseline justify-center gap-2 flex-wrap">
+                <div
+                  className="font-display"
+                  style={{
+                    fontWeight: 700,
+                    fontSize: 'clamp(4rem, 18vw, 6rem)',
+                    lineHeight: 0.92,
+                    color: '#ff6b6b',
+                    textShadow: '0 4px 0 #a83a3a, 0 5px 8px rgba(40,30,60,0.2)',
+                    letterSpacing: '-0.03em',
+                  }}
+                >
+                  {userCount != null ? fmt(userCount) : '—'}
+                </div>
+                <div
+                  className="font-display"
+                  style={{ fontWeight: 600, fontSize: '1.25rem', color: '#7a6a55' }}
+                >
+                  / {fmt(TOTAL)}
+                </div>
+              </div>
+
+              {/* Rainbow progress bar */}
+              <div
+                className="mt-3 mx-auto"
+                style={{
+                  width: '88%', height: 12, borderRadius: 999,
+                  background: '#f4e4c8',
+                  border: '2px solid #2a3445',
+                  overflow: 'hidden', position: 'relative',
+                }}
+              >
+                <div
+                  style={{
+                    height: '100%',
+                    width: `${(progressAnim * 100).toFixed(1)}%`,
+                    background: 'linear-gradient(90deg, #7dd3a4, #5fa8d3, #ffe066, #ff7e7e)',
+                    borderRadius: 999,
+                    transition: 'width 0.6s ease-out',
                   }}
                 />
               </div>
+              <div
+                className="font-display"
+                style={{
+                  fontWeight: 600, fontSize: 12, color: '#7a6a55',
+                  marginTop: 8, letterSpacing: '0.02em',
+                }}
+              >
+                <span style={{ color: '#ff6b6b', fontWeight: 700 }}>
+                  {pct != null ? `${pct.toFixed(1)}%` : '—'}
+                </span>
+                {' complete · '}
+                {remaining != null ? `${fmt(remaining)} to go!` : ''}
+              </div>
             </div>
 
-            {/* View buttons */}
-            <div className="mt-6 anim-4 flex flex-wrap items-center justify-center gap-2">
+            {/* "Your collection" section title with yellow accent dot */}
+            <div className="anim-5 mb-2 mt-1 flex items-center gap-2">
+              <span
+                style={{
+                  width: 14, height: 14, borderRadius: '50%',
+                  background: '#ffe066', border: '2px solid #c9a01a',
+                  display: 'inline-block',
+                }}
+              />
+              <h2 className="font-display" style={{ fontWeight: 600, fontSize: 15, color: '#2a3445', letterSpacing: '0.01em' }}>
+                Your collection
+              </h2>
+            </div>
+
+            {/* ===== Color-coded chunky stat tiles =====
+                Five color themes (mint/coral/sky/lemon/peach) one per tile.
+                Each tile is a chunky rounded card with thick dark border +
+                offset shadow + colored fill + illustrated icon.
+                ===== */}
+            <div className="grid grid-cols-2 gap-2.5 mb-4 anim-5">
+              {/* Observations (sky theme) */}
+              <div
+                style={{
+                  background: '#d8eef9', border: '2.5px solid #2a5680',
+                  boxShadow: '0 4px 0 0 #2a5680', borderRadius: 18,
+                  padding: '12px 14px',
+                }}
+              >
+                <div className="flex items-start gap-2">
+                  <BinocularsIcon size={32} className="flex-shrink-0" />
+                  <div>
+                    <div className="font-display" style={{ fontWeight: 600, fontSize: 11, color: '#5a4a3e', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
+                      Sightings
+                    </div>
+                    <div className="font-display" style={{ fontWeight: 700, fontSize: 24, color: '#2a3445', lineHeight: 1 }}>
+                      {csvMeta ? fmt(csvMeta.observations) : '—'}
+                    </div>
+                  </div>
+                </div>
+                <div className="font-sans" style={{ fontWeight: 600, fontSize: 10, color: '#7a6a55', marginTop: 5 }}>
+                  since {csvMeta?.earliest ? fmtDate(csvMeta.earliest) : '—'}
+                </div>
+              </div>
+
+              {/* Families (mint theme) — tap to open the families drawer */}
+              <button
+                onClick={() => setShowFamilies(true)}
+                aria-label="View all bird families"
+                className="text-left lift"
+                style={{
+                  background: '#d8f3df', border: '2.5px solid #2e6b4f',
+                  boxShadow: '0 4px 0 0 #2e6b4f', borderRadius: 18,
+                  padding: '12px 14px',
+                }}
+              >
+                <div className="flex items-start gap-2">
+                  <TreeIcon size={28} className="flex-shrink-0" />
+                  <div>
+                    <div className="font-display" style={{ fontWeight: 600, fontSize: 11, color: '#5a4a3e', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
+                      Families
+                    </div>
+                    <div className="font-display" style={{ fontWeight: 700, fontSize: 24, color: '#2a3445', lineHeight: 1 }}>
+                      {familiesSeen}<span style={{ fontSize: 13, color: '#7a6a55', fontWeight: 600, marginLeft: 3 }}>/{TOTAL_FAMILIES}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="font-sans" style={{ fontWeight: 600, fontSize: 10, color: '#7a6a55', marginTop: 5 }}>
+                  tap to browse
+                </div>
+              </button>
+
+              {/* At-risk (coral theme) — tap to open at-risk list */}
+              <button
+                onClick={openAtRiskList}
+                aria-label="View at-risk native species"
+                className="text-left lift"
+                style={{
+                  background: '#ffe0d4', border: '2.5px solid #a83a3a',
+                  boxShadow: '0 4px 0 0 #a83a3a', borderRadius: 18,
+                  padding: '12px 14px',
+                }}
+              >
+                <div className="flex items-start gap-2">
+                  <HeartIcon size={28} className="flex-shrink-0" />
+                  <div>
+                    <div className="font-display" style={{ fontWeight: 600, fontSize: 11, color: '#5a4a3e', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
+                      At-risk
+                    </div>
+                    <div className="font-display" style={{ fontWeight: 700, fontSize: 24, color: '#2a3445', lineHeight: 1 }}>
+                      {atRiskSeen}<span style={{ fontSize: 13, color: '#7a6a55', fontWeight: 600, marginLeft: 3 }}>/{TOTAL_AT_RISK}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="font-sans" style={{ fontWeight: 600, fontSize: 10, color: '#7a6a55', marginTop: 5 }}>
+                  IUCN threatened
+                </div>
+              </button>
+
+              {/* Latest (lemon theme) */}
+              <div
+                style={{
+                  background: '#fff3c4', border: '2.5px solid #c9a01a',
+                  boxShadow: '0 4px 0 0 #c9a01a', borderRadius: 18,
+                  padding: '12px 14px',
+                }}
+              >
+                <div className="flex items-start gap-2">
+                  <CalendarIcon size={28} className="flex-shrink-0" />
+                  <div>
+                    <div className="font-display" style={{ fontWeight: 600, fontSize: 11, color: '#5a4a3e', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
+                      Latest
+                    </div>
+                    <div className="font-display" style={{ fontWeight: 700, fontSize: 18, color: '#2a3445', lineHeight: 1 }}>
+                      {csvMeta?.latest ? fmtDate(csvMeta.latest) : '—'}
+                    </div>
+                  </div>
+                </div>
+                <div className="font-sans" style={{ fontWeight: 600, fontSize: 10, color: '#7a6a55', marginTop: 5 }}>
+                  most recent entry
+                </div>
+              </div>
+            </div>
+
+            {/* ===== Tertiary action buttons row =====
+                Browse-all and find-missed-birds — chunky pill buttons */}
+            <div className="anim-5 flex flex-wrap items-center gap-2 mb-4">
               <button
                 onClick={openAllSpecies}
-                className="btn-ghost rounded-full px-5 py-2.5 text-sm inline-flex items-center gap-2"
+                className="btn-ghost rounded-full px-4 py-2 text-sm inline-flex items-center gap-2"
               >
-                <List size={14} strokeWidth={2} />
+                <List size={14} strokeWidth={2.5} />
                 Browse all {TOTAL}
               </button>
-              {points && points.length > 0 && (
-                <button
-                  onClick={() => setView('map')}
-                  className="btn-ghost rounded-full px-5 py-2.5 text-sm inline-flex items-center gap-2"
-                >
-                  <MapIcon size={14} strokeWidth={2} />
-                  Sightings map
-                </button>
-              )}
               {userCount != null && (
                 <button
                   onClick={() => setShowTips(true)}
-                  className="btn-ink rounded-full px-5 py-2.5 text-sm inline-flex items-center gap-2"
+                  className="btn-ghost rounded-full px-4 py-2 text-sm inline-flex items-center gap-2"
                 >
-                  <Search size={14} strokeWidth={2} />
+                  <Search size={14} strokeWidth={2.5} />
                   Find missed birds
                 </button>
               )}
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-10 anim-5">
-              <div className="surface-1 rounded-2xl p-4">
-                <div className="font-mono text-[10px] ink-faint tracking-widest uppercase mb-2">Observations</div>
-                <div className="font-display ink" style={{ fontSize: '1.5rem', fontWeight: 700 }}>
-                  {csvMeta ? fmt(csvMeta.observations) : '—'}
-                </div>
-              </div>
+            {/* ===== Map CTA — chunky green pill (the big "go explore" button) ===== */}
+            {points && points.length > 0 && (
               <button
-                onClick={() => setShowFamilies(true)}
-                className="surface-1 rounded-2xl p-4 text-left lift relative group"
-                aria-label="View all 81 bird families"
+                onClick={() => setView('map')}
+                className="anim-5 w-full inline-flex items-center justify-between gap-3 mb-4"
+                style={{
+                  background: 'linear-gradient(180deg, #7dd3a4 0%, #5cba87 100%)',
+                  border: '3px solid #2e6b4f',
+                  boxShadow: '0 5px 0 0 #2e6b4f',
+                  borderRadius: 20,
+                  padding: '14px 18px',
+                  color: '#fff',
+                }}
               >
-                <div className="font-mono text-[10px] ink-faint tracking-widest uppercase mb-2 flex items-center justify-between">
-                  <span>Families seen</span>
-                  <ChevronRight size={12} className="ink-faint group-hover:ink-soft transition-colors" />
+                <div className="flex items-center gap-3">
+                  <Compass size={42} className="flex-shrink-0" />
+                  <div className="text-left">
+                    <div
+                      className="font-display"
+                      style={{
+                        fontWeight: 700, fontSize: 18, letterSpacing: '0.01em',
+                        textShadow: '0 1.5px 0 #2e6b4f', lineHeight: 1,
+                      }}
+                    >
+                      My Map
+                    </div>
+                    <div
+                      className="font-sans"
+                      style={{
+                        fontWeight: 600, fontSize: 11, marginTop: 3,
+                        color: '#e0fff0',
+                      }}
+                    >
+                      {csvMeta?.locationCount ? fmt(csvMeta.locationCount) : '—'} sites · 11 regions
+                    </div>
+                  </div>
                 </div>
-                <div className="font-display ink leading-none" style={{ fontSize: '1.5rem', fontWeight: 700 }}>
-                  {familiesSeen}
-                  <span className="ink-faint" style={{ fontSize: '0.7em', fontWeight: 500, marginLeft: '0.15em' }}>
-                    / {TOTAL_FAMILIES}
-                  </span>
+                <div
+                  style={{
+                    width: 32, height: 32, borderRadius: '50%',
+                    background: '#fff', border: '2.5px solid #2e6b4f',
+                    boxShadow: '0 2px 0 0 #2e6b4f',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#2e6b4f',
+                    fontWeight: 700, fontSize: 18,
+                  }}
+                >
+                  ›
                 </div>
               </button>
-              <button
-                onClick={openAtRiskList}
-                className="surface-1 rounded-2xl p-4 text-left lift relative group"
-                aria-label="View the IUCN at-risk native species"
-              >
-                <div className="font-mono text-[10px] ink-faint tracking-widest uppercase mb-2 flex items-center justify-between">
-                  <span>At-risk species</span>
-                  <ChevronRight size={12} className="ink-faint group-hover:ink-soft transition-colors" />
-                </div>
-                <div className="font-display leading-none" style={{ fontSize: '1.5rem', fontWeight: 700, color: '#fb923c' }}>
-                  {atRiskSeen}
-                  <span className="ink-faint" style={{ fontSize: '0.7em', fontWeight: 500, marginLeft: '0.15em' }}>
-                    / {TOTAL_AT_RISK}
-                  </span>
-                </div>
-                <div className="font-mono text-[9px] ink-faint tracking-wider mt-1">IUCN threatened</div>
-              </button>
-              <div className="surface-1 rounded-2xl p-4">
-                <div className="font-mono text-[10px] ink-faint tracking-widest uppercase mb-2">First sighting</div>
-                <div className="font-display ink" style={{ fontSize: '0.95rem', fontWeight: 500 }}>
-                  {csvMeta?.earliest ? fmtDate(csvMeta.earliest) : '—'}
-                </div>
-              </div>
-              <div className="surface-1 rounded-2xl p-4 col-span-2 sm:col-span-1">
-                <div className="font-mono text-[10px] ink-faint tracking-widest uppercase mb-2">Latest entry</div>
-                <div className="font-display ink" style={{ fontSize: '0.95rem', fontWeight: 500 }}>
-                  {csvMeta?.latest ? fmtDate(csvMeta.latest) : '—'}
-                </div>
-              </div>
-            </div>
+            )}
 
             {csvMeta?.allCount != null && userCount != null && csvMeta.allCount > userCount && (
               <div className="mt-6 anim-5">
@@ -2034,15 +2332,17 @@ export default function BirdLifeTracker() {
       {/* toasts */}
       {(error || success) && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 toast z-50 max-w-md w-[90%]">
-          <div className={`flex items-start gap-3 px-4 py-3 rounded-2xl backdrop-blur-md ${error ? '' : ''}`}
+          <div className="flex items-start gap-3 px-4 py-3 rounded-2xl"
                style={{
-                 background: error ? 'rgba(127, 29, 29, 0.85)' : 'rgba(20, 83, 45, 0.85)',
-                 border: `1px solid ${error ? 'rgba(248, 113, 113, 0.30)' : 'rgba(74, 222, 128, 0.30)'}`,
-                 color: '#f5f5f4',
-                 boxShadow: '0 12px 32px rgba(0,0,0,0.4)',
+                 background: error ? '#ffe0d4' : '#d8f3df',
+                 border: `2.5px solid ${error ? '#a83a3a' : '#2e6b4f'}`,
+                 boxShadow: `0 4px 0 0 ${error ? '#a83a3a' : '#2e6b4f'}`,
+                 color: '#2a3445',
                }}>
-            {error ? <AlertCircle size={18} className="shrink-0 mt-0.5" /> : <Check size={18} className="shrink-0 mt-0.5" />}
-            <div className="flex-1 text-sm leading-relaxed">{error || success}</div>
+            {error
+              ? <AlertCircle size={18} className="shrink-0 mt-0.5" style={{ color: '#a83a3a' }} />
+              : <Check size={18} className="shrink-0 mt-0.5" style={{ color: '#2e6b4f' }} />}
+            <div className="flex-1 text-sm leading-relaxed font-sans font-semibold">{error || success}</div>
             <button onClick={() => { setError(null); setSuccess(null); }} className="opacity-70 hover:opacity-100">
               <X size={16} />
             </button>
@@ -2086,7 +2386,7 @@ export default function BirdLifeTracker() {
 
       {/* settings drawer */}
       {showSettings && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }} onClick={() => setShowSettings(false)}>
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4" style={{ background: 'rgba(42,52,69,0.45)', backdropFilter: 'blur(3px)' }} onClick={() => setShowSettings(false)}>
           <div
             className="surface-2 rounded-2xl max-w-md w-full p-7 relative"
             style={{ boxShadow: '0 30px 80px rgba(0,0,0,0.5)' }}
@@ -2103,7 +2403,7 @@ export default function BirdLifeTracker() {
               <input
                 type="file"
                 accept=".csv,text/csv"
-                className="text-xs ink-soft block w-full file:mr-3 file:px-3 file:py-1.5 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-[#f97316] file:text-[#0c1f1f] file:cursor-pointer hover:file:bg-[#fb923c]"
+                className="text-xs ink-soft block w-full file:mr-3 file:px-3 file:py-1.5 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-[#ff6b6b] file:text-white file:cursor-pointer hover:file:bg-[#ff8888]"
                 onChange={(e) => onCsvFile(e.target.files?.[0])}
               />
               {csvMeta && (
@@ -2241,7 +2541,7 @@ export default function BirdLifeTracker() {
 
       {/* about drawer */}
       {showAbout && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }} onClick={() => setShowAbout(false)}>
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4" style={{ background: 'rgba(42,52,69,0.45)', backdropFilter: 'blur(3px)' }} onClick={() => setShowAbout(false)}>
           <div
             className="surface-2 rounded-2xl max-w-lg w-full p-7 relative max-h-[85vh] overflow-y-auto"
             style={{ boxShadow: '0 30px 80px rgba(0,0,0,0.5)' }}
@@ -2304,8 +2604,16 @@ export default function BirdLifeTracker() {
       )}
 
       {!hydrated && (
-        <div className="fixed inset-0 flex items-center justify-center" style={{ background: '#0c1f1f' }}>
-          <div className="font-mono text-xs ink-faint tracking-widest animate-pulse">loading…</div>
+        <div
+          className="fixed inset-0 flex items-center justify-center"
+          style={{ background: 'linear-gradient(180deg, #6cb8e4 0%, #a8d8eb 40%, #f8d9a8 100%)' }}
+        >
+          <div className="flex flex-col items-center gap-3">
+            <BluebirdMascot size={56} className="animate-pulse" />
+            <div className="font-display text-sm" style={{ color: '#2a5680', fontWeight: 600, letterSpacing: '0.1em' }}>
+              loading…
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -2372,10 +2680,10 @@ function SpeciesListDrawer({ seenSci, onClose, title, subtitle, eyebrow, restric
   const displayEyebrow = eyebrow || 'Species Index';
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center p-2 sm:p-4" style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }} onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex items-center justify-center p-2 sm:p-4" style={{ background: 'rgba(42,52,69,0.45)', backdropFilter: 'blur(3px)' }} onClick={onClose}>
       <div
         className="max-w-2xl w-full relative flex flex-col rounded-2xl overflow-hidden"
-        style={{ background: '#142926', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 30px 80px rgba(0,0,0,0.5)', maxHeight: '92vh' }}
+        style={{ background: '#fff8e8', border: '3px solid #2a3445', boxShadow: '0 8px 0 0 #2a3445, 0 30px 80px rgba(0,0,0,0.35)', maxHeight: '92vh' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* header */}
@@ -2576,10 +2884,10 @@ function FamiliesDrawer({ seenSci, onClose, onFamilyClick }) {
   }, [families, query, filter]);
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center p-2 sm:p-4" style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }} onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex items-center justify-center p-2 sm:p-4" style={{ background: 'rgba(42,52,69,0.45)', backdropFilter: 'blur(3px)' }} onClick={onClose}>
       <div
         className="max-w-2xl w-full relative flex flex-col rounded-2xl overflow-hidden"
-        style={{ background: '#142926', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 30px 80px rgba(0,0,0,0.5)', maxHeight: '92vh' }}
+        style={{ background: '#fff8e8', border: '3px solid #2a3445', boxShadow: '0 8px 0 0 #2a3445, 0 30px 80px rgba(0,0,0,0.35)', maxHeight: '92vh' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* header */}
@@ -2924,10 +3232,10 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
   const shownTips = (tips || []).slice(0, 40);
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center p-2 sm:p-4" style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }} onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex items-center justify-center p-2 sm:p-4" style={{ background: 'rgba(42,52,69,0.45)', backdropFilter: 'blur(3px)' }} onClick={onClose}>
       <div
         className="max-w-2xl w-full relative flex flex-col rounded-2xl overflow-hidden"
-        style={{ background: '#142926', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 30px 80px rgba(0,0,0,0.5)', maxHeight: '92vh' }}
+        style={{ background: '#fff8e8', border: '3px solid #2a3445', boxShadow: '0 8px 0 0 #2a3445, 0 30px 80px rgba(0,0,0,0.35)', maxHeight: '92vh' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* header */}
@@ -3142,7 +3450,7 @@ function InstallPromptDrawer({ onClose }) {
   const isSafari = /Safari/.test(ua) && !/Chrome|CriOS|FxiOS|EdgiOS/.test(ua);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }} onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(42,52,69,0.45)', backdropFilter: 'blur(3px)' }} onClick={onClose}>
       <div
         className="surface-2 rounded-2xl max-w-md w-full p-7 relative"
         style={{ boxShadow: '0 30px 80px rgba(0,0,0,0.5)' }}
@@ -3165,16 +3473,16 @@ function InstallPromptDrawer({ onClose }) {
             </p>
             <ol className="space-y-3 text-sm ink-soft">
               <li className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center font-mono text-xs ink shrink-0" style={{ fontWeight: 600 }}>1</span>
+                <span className="w-6 h-6 rounded-full flex items-center justify-center font-mono text-xs ink shrink-0 bg-yellow-100 border-2 border-yellow-600" style={{ fontWeight: 600 }}>1</span>
                 <span>
-                  Tap the <span className="inline-flex items-center px-2 py-0.5 rounded" style={{ background: 'rgba(45,212,191,0.12)' }}>
+                  Tap the <span className="inline-flex items-center px-2 py-0.5 rounded" style={{ background: 'rgba(95,168,211,0.15)', border: '1.5px solid #5fa8d3' }}>
                     <Share2 size={13} className="teal mr-1" />
                     <span className="teal text-xs" style={{ fontWeight: 600 }}>Share</span>
                   </span> button at the bottom of Safari
                 </span>
               </li>
               <li className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center font-mono text-xs ink shrink-0" style={{ fontWeight: 600 }}>2</span>
+                <span className="w-6 h-6 rounded-full flex items-center justify-center font-mono text-xs ink shrink-0 bg-yellow-100 border-2 border-yellow-600" style={{ fontWeight: 600 }}>2</span>
                 <span>
                   Scroll down and tap <span className="inline-flex items-center px-2 py-0.5 rounded" style={{ background: 'rgba(249,115,22,0.10)' }}>
                     <Plus size={13} className="rust mr-1" />
@@ -3183,7 +3491,7 @@ function InstallPromptDrawer({ onClose }) {
                 </span>
               </li>
               <li className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center font-mono text-xs ink shrink-0" style={{ fontWeight: 600 }}>3</span>
+                <span className="w-6 h-6 rounded-full flex items-center justify-center font-mono text-xs ink shrink-0 bg-yellow-100 border-2 border-yellow-600" style={{ fontWeight: 600 }}>3</span>
                 <span>Tap <span className="ink" style={{ fontWeight: 600 }}>Add</span> in the top right</span>
               </li>
             </ol>
@@ -3192,15 +3500,15 @@ function InstallPromptDrawer({ onClose }) {
           <div className="space-y-3 text-sm ink-soft">
             <ol className="space-y-3">
               <li className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center font-mono text-xs ink shrink-0" style={{ fontWeight: 600 }}>1</span>
+                <span className="w-6 h-6 rounded-full flex items-center justify-center font-mono text-xs ink shrink-0 bg-yellow-100 border-2 border-yellow-600" style={{ fontWeight: 600 }}>1</span>
                 <span>Tap the <span className="ink" style={{ fontWeight: 600 }}>⋮ menu</span> in your browser's top right</span>
               </li>
               <li className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center font-mono text-xs ink shrink-0" style={{ fontWeight: 600 }}>2</span>
+                <span className="w-6 h-6 rounded-full flex items-center justify-center font-mono text-xs ink shrink-0 bg-yellow-100 border-2 border-yellow-600" style={{ fontWeight: 600 }}>2</span>
                 <span>Select <span className="ink" style={{ fontWeight: 600 }}>Install app</span> or <span className="ink" style={{ fontWeight: 600 }}>Add to Home Screen</span></span>
               </li>
               <li className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center font-mono text-xs ink shrink-0" style={{ fontWeight: 600 }}>3</span>
+                <span className="w-6 h-6 rounded-full flex items-center justify-center font-mono text-xs ink shrink-0 bg-yellow-100 border-2 border-yellow-600" style={{ fontWeight: 600 }}>3</span>
                 <span>Confirm to add the icon</span>
               </li>
             </ol>
@@ -3209,7 +3517,7 @@ function InstallPromptDrawer({ onClose }) {
           <div className="space-y-3 text-sm ink-soft">
             <p>
               Look for an install icon in your browser's address bar, or use the browser menu to find
-              "Install Census" or "Add to Home Screen".
+              "Install Birder" or "Add to Home Screen".
             </p>
             <p className="text-xs ink-faint">For the best experience, open this site on your phone (iPhone or Android).</p>
           </div>
@@ -3325,13 +3633,16 @@ const REGION_PROJ_FN = {
 // a hard 60%-alpha edge.
 function heatColor(t) {
   t = Math.max(0, Math.min(1, t));
+  // Birdfolk sunset ramp — cream transparent fringe blooming through warm
+  // yellow, peach, coral, and a hot pink-red core. Calibrated to read clearly
+  // against the pale mint basemap and the cream card behind the map.
   const stops = [
-    { at: 0.00, c: [253, 218, 100, 0.00] }, // fully transparent fringe
-    { at: 0.20, c: [251, 195,  90, 0.40] }, // golden yellow emerging
-    { at: 0.40, c: [248, 160,  75, 0.66] }, // warm amber
-    { at: 0.60, c: [243, 125,  65, 0.80] }, // soft orange
-    { at: 0.80, c: [232,  90,  55, 0.88] }, // peach
-    { at: 1.00, c: [218,  60,  42, 0.92] }, // bright peach red
+    { at: 0.00, c: [255, 245, 225, 0.00] }, // transparent cream fringe
+    { at: 0.15, c: [255, 224, 102, 0.45] }, // soft sunshine yellow
+    { at: 0.35, c: [255, 184, 110, 0.65] }, // amber peach
+    { at: 0.55, c: [255, 154, 118, 0.75] }, // warm peach
+    { at: 0.75, c: [255, 107, 107, 0.85] }, // coral
+    { at: 1.00, c: [201,  54,  54, 0.92] }, // hot pink-red core
   ];
   for (let i = 1; i < stops.length; i++) {
     if (t <= stops[i].at) {
@@ -3591,12 +3902,12 @@ function SightingsMapView({
       try {
         if (document.fonts) {
           await Promise.all([
-            document.fonts.load('800 280px Montserrat'),
-            document.fonts.load('700 32px Montserrat'),
-            document.fonts.load('600 42px Montserrat'),
-            document.fonts.load('600 36px Montserrat'),
-            document.fonts.load('500 38px Montserrat'),
-            document.fonts.load('500 26px Montserrat'),
+            document.fonts.load('700 280px Fredoka'),
+            document.fonts.load('700 56px Fredoka'),
+            document.fonts.load('700 42px Fredoka'),
+            document.fonts.load('600 36px Fredoka'),
+            document.fonts.load('700 28px Fredoka'),
+            document.fonts.load('700 64px Fredoka'),
           ]);
         }
       } catch {
@@ -3649,14 +3960,14 @@ function SightingsMapView({
         // Glassy fill: very subtle top-to-bottom highlight
         rrPath(x, y, w, h, r);
         const fillGrad = ctx.createLinearGradient(0, y, 0, y + h);
-        fillGrad.addColorStop(0, 'rgba(255,255,255,0.055)');
-        fillGrad.addColorStop(1, 'rgba(255,255,255,0.012)');
+        fillGrad.addColorStop(0, 'rgba(255,255,255,0.95)');
+        fillGrad.addColorStop(1, 'rgba(255,248,232,0.95)');
         ctx.fillStyle = fillGrad;
         ctx.fill();
         // Beveled border: brighter at top, dimmer at bottom — the "Liquid Glass" cue
         rrPath(x, y, w, h, r);
         const borderGrad = ctx.createLinearGradient(0, y, 0, y + h);
-        borderGrad.addColorStop(0, 'rgba(255,255,255,0.22)');
+        borderGrad.addColorStop(0, 'rgba(42,52,69,0.3)');
         borderGrad.addColorStop(0.5, 'rgba(255,255,255,0.06)');
         borderGrad.addColorStop(1, 'rgba(255,255,255,0.03)');
         ctx.strokeStyle = borderGrad;
@@ -3666,17 +3977,17 @@ function SightingsMapView({
 
       // === Background: subtle vertical gradient (lighter top → deeper bottom) ===
       const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
-      bgGrad.addColorStop(0, '#0e2a2a');
-      bgGrad.addColorStop(0.35, '#0c1f1f');
-      bgGrad.addColorStop(1, '#07171b');
+      bgGrad.addColorStop(0, '#6cb8e4');
+      bgGrad.addColorStop(0.35, '#a8d8eb');
+      bgGrad.addColorStop(1, '#f8d9a8');
       ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, W, H);
 
       // Warm orange halo behind the hero card for depth
       const halo = ctx.createRadialGradient(W / 2, 420, 80, W / 2, 420, 700);
-      halo.addColorStop(0, 'rgba(249, 115, 22, 0.12)');
-      halo.addColorStop(0.5, 'rgba(249, 115, 22, 0.04)');
-      halo.addColorStop(1, 'rgba(249, 115, 22, 0)');
+      halo.addColorStop(0, 'rgba(255, 224, 102, 0.20)');
+      halo.addColorStop(0.5, 'rgba(255, 224, 102, 0.08)');
+      halo.addColorStop(1, 'rgba(255, 224, 102, 0)');
       ctx.fillStyle = halo;
       ctx.fillRect(0, 0, W, H);
 
@@ -3684,12 +3995,12 @@ function SightingsMapView({
       const pct = (count / TOTAL) * 100;
       const cx = W / 2;
 
-      // === Top-left logo: feather + CENSUS wordmark ===
+      // === Top-left logo: feather + BIRDER wordmark ===
       ctx.save();
       ctx.translate(60, 60);
       ctx.scale(2.1, 2.1);
-      ctx.strokeStyle = '#fb923c';
-      ctx.lineWidth = 2.4;
+      ctx.strokeStyle = '#ff6b6b';
+      ctx.lineWidth = 3;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       const feather = new Path2D('M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z');
@@ -3700,11 +4011,11 @@ function SightingsMapView({
       ctx.moveTo(17.5, 15); ctx.lineTo(9, 15); ctx.stroke();
       ctx.restore();
 
-      ctx.font = '700 32px Montserrat, system-ui, sans-serif';
-      ctx.fillStyle = '#f5f5f4';
+      ctx.font = '700 56px Fredoka, system-ui, sans-serif';
+      ctx.fillStyle = '#2a3445';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'alphabetic';
-      ctx.fillText('CENSUS', 130, 100);
+      ctx.fillText('Birder', 130, 100);
 
       // === Hero glass card: count + percentage ===
       const heroX = 60, heroY = 180, heroW = 960, heroH = 480;
@@ -3713,23 +4024,23 @@ function SightingsMapView({
       ctx.textAlign = 'center';
 
       // Eyebrow inside hero
-      ctx.font = '600 14px "JetBrains Mono", ui-monospace, monospace';
-      ctx.fillStyle = '#6b7773';
+      ctx.font = '700 18px Nunito, system-ui, sans-serif';
+      ctx.fillStyle = '#5fa8d3';
       ctx.fillText('LIFE LIST', cx, heroY + 50);
 
       // Giant count
-      ctx.font = '800 260px Montserrat, system-ui, sans-serif';
-      ctx.fillStyle = '#f5f5f4';
+      ctx.font = '700 260px Fredoka, system-ui, sans-serif';
+      ctx.fillStyle = '#ff6b6b';
       ctx.fillText(`${count}`, cx, heroY + 280);
 
       // "of 774 native US birds"
-      ctx.font = '500 36px Montserrat, system-ui, sans-serif';
-      ctx.fillStyle = '#a8b1ae';
+      ctx.font = '600 36px Fredoka, system-ui, sans-serif';
+      ctx.fillStyle = '#5a4a3e';
       ctx.fillText(`of ${TOTAL} native US birds`, cx, heroY + 345);
 
       // Orange accent line
-      ctx.strokeStyle = '#fb923c';
-      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#ff6b6b';
+      ctx.lineWidth = 5;
       ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(cx - 56, heroY + 388);
@@ -3737,8 +4048,8 @@ function SightingsMapView({
       ctx.stroke();
 
       // Percentage (orange)
-      ctx.font = '600 40px Montserrat, system-ui, sans-serif';
-      ctx.fillStyle = '#fb923c';
+      ctx.font = '700 40px Fredoka, system-ui, sans-serif';
+      ctx.fillStyle = '#ff6b6b';
       ctx.fillText(`${pct.toFixed(1)}% complete`, cx, heroY + 440);
 
       // === Stats strip: three small glass cards ===
@@ -3752,19 +4063,19 @@ function SightingsMapView({
           label: 'FAMILIES',
           value: `${familiesSeen}`,
           sub: `of ${FAMILY_BOUNDARIES.length}`,
-          color: '#f5f5f4',
+          color: '#2a3445',
         },
         {
           label: 'AT-RISK',
           value: `${atRiskSeen}`,
           sub: 'IUCN threatened',
-          color: '#fb923c',
+          color: '#ff6b6b',
         },
         {
           label: 'LOCATIONS',
           value: locationCount.toLocaleString(),
           sub: 'birded',
-          color: '#f5f5f4',
+          color: '#2a3445',
         },
       ];
 
@@ -3774,16 +4085,16 @@ function SightingsMapView({
 
         const cxStat = x + cardW / 2;
         // Label (mono, eyebrow)
-        ctx.font = '600 13px "JetBrains Mono", ui-monospace, monospace';
-        ctx.fillStyle = '#6b7773';
+        ctx.font = '700 14px Nunito, system-ui, sans-serif';
+        ctx.fillStyle = '#5a4a3e';
         ctx.fillText(s.label, cxStat, stripY + 36);
         // Big number
-        ctx.font = '700 64px Montserrat, system-ui, sans-serif';
+        ctx.font = '700 64px Fredoka, system-ui, sans-serif';
         ctx.fillStyle = s.color;
         ctx.fillText(s.value, cxStat, stripY + 100);
         // Sub-label
-        ctx.font = '500 14px Montserrat, system-ui, sans-serif';
-        ctx.fillStyle = '#6b7773';
+        ctx.font = '600 14px Nunito, system-ui, sans-serif';
+        ctx.fillStyle = '#7a6a55';
         ctx.fillText(s.sub, cxStat, stripY + 125);
       });
 
@@ -3818,26 +4129,26 @@ function SightingsMapView({
 
       // === Caption + CTA at the bottom ===
       ctx.textAlign = 'center';
-      ctx.font = '600 42px Montserrat, system-ui, sans-serif';
-      ctx.fillStyle = '#f5f5f4';
+      ctx.font = '700 42px Fredoka, system-ui, sans-serif';
+      ctx.fillStyle = '#2a3445';
       ctx.fillText(`How many have YOU found?`, cx, 1730);
 
-      ctx.font = '500 26px Montserrat, system-ui, sans-serif';
-      ctx.fillStyle = '#fb923c';
-      ctx.fillText(`Find yours at CENSUS`, cx, 1782);
+      ctx.font = '700 28px Fredoka, system-ui, sans-serif';
+      ctx.fillStyle = '#ff6b6b';
+      ctx.fillText(`Find yours at Birder`, cx, 1782);
 
       URL.revokeObjectURL(svgUrl);
 
       const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png', 0.95));
       if (!blob) throw new Error('Image encoding failed');
 
-      const file = new File([blob], 'census.png', { type: 'image/png' });
+      const file = new File([blob], 'birder.png', { type: 'image/png' });
 
       // Prefer the Web Share API on mobile (iOS 15+, recent Android)
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
-          title: 'My Continental Census',
+          title: 'My Birder',
           text: `${count}/${TOTAL} native US bird species · ${pct.toFixed(1)}%`,
         });
       } else {
@@ -3845,7 +4156,7 @@ function SightingsMapView({
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `census-${count}-of-${TOTAL}.png`;
+        a.download = `birder-${count}-of-${TOTAL}.png`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -3866,45 +4177,90 @@ function SightingsMapView({
       className="relative max-w-3xl mx-auto px-4 sm:px-8 py-4 sm:py-6 flex flex-col"
       style={{ minHeight: '100vh' }}
     >
-      {/* Page header — replaces the modal close X with a back arrow. The map
-          gets its own dedicated route-like view rather than living as an
-          overlay over the dashboard. */}
-      <header className="anim-1 flex items-center justify-between mb-4 shrink-0">
+      {/* ===== Map page header — chunky mint banner =====
+          Mint-green gradient with thick dark-mint border + offset shadow.
+          The back button reads "Home" (matching the homepage's chunky vibe)
+          rather than "Census" or "Birder" wordmarking — quicker to parse on
+          a small screen and consistent with how Animal Crossing menus label
+          their back actions. */}
+      <header
+        className="anim-1 relative flex items-center justify-between mb-3 shrink-0"
+        style={{
+          background: 'linear-gradient(135deg, #7dd3a4 0%, #a8e6cf 100%)',
+          border: '3px solid #2e6b4f',
+          boxShadow: '0 4px 0 0 #2e6b4f',
+          borderRadius: 22,
+          padding: '12px 16px',
+        }}
+      >
         <button
           onClick={onBack}
-          className="btn-ghost rounded-full pl-3 pr-4 py-2 text-sm inline-flex items-center gap-2"
-          aria-label="Back to dashboard"
+          aria-label="Back to home"
+          className="inline-flex items-center gap-1.5"
+          style={{
+            background: '#fff',
+            border: '2.5px solid #2e6b4f',
+            borderRadius: 999,
+            padding: '6px 14px 6px 10px',
+            color: '#2e6b4f',
+            boxShadow: '0 2px 0 0 #2e6b4f',
+            fontFamily: 'Fredoka, sans-serif',
+            fontWeight: 600,
+            fontSize: 13,
+          }}
         >
-          <ChevronLeft size={16} strokeWidth={2.25} />
-          <span className="font-mono text-[10px] tracking-[0.2em] uppercase">Census</span>
+          <ChevronLeft size={14} strokeWidth={3} />
+          Home
         </button>
-        <div className="font-mono text-[9px] ink-faint tracking-[0.2em] uppercase">Cartography</div>
+        <div
+          className="font-display"
+          style={{
+            fontWeight: 700, fontSize: 13, color: '#fff',
+            textShadow: '0 1.5px 0 #2e6b4f',
+            letterSpacing: '0.08em',
+          }}
+        >
+          MY MAP
+        </div>
       </header>
 
-      {/* Filter pills */}
-      <div className="anim-2 mb-3 flex items-center gap-2 shrink-0">
+      {/* Filter pills — coral when active, white otherwise */}
+      <div className="anim-2 mb-3 grid grid-cols-2 gap-2 shrink-0">
         <button
           onClick={() => setMode('all')}
-          className={`rounded-full px-4 py-1.5 text-xs transition-colors ${mode === 'all' ? 'btn-ink' : 'btn-ghost'}`}
           aria-pressed={mode === 'all'}
+          className={mode === 'all' ? 'btn-ink' : 'btn-ghost'}
+          style={{
+            borderRadius: 999, padding: '8px 12px', fontSize: 13,
+          }}
         >
           All sightings
         </button>
         <button
           onClick={() => setMode('first')}
-          className={`rounded-full px-4 py-1.5 text-xs transition-colors ${mode === 'first' ? 'btn-ink' : 'btn-ghost'}`}
           aria-pressed={mode === 'first'}
           title="Heat by first-found location of each species"
+          className={mode === 'first' ? 'btn-ink' : 'btn-ghost'}
+          style={{
+            borderRadius: 999, padding: '8px 12px', fontSize: 13,
+          }}
         >
           First sightings
         </button>
       </div>
 
       {/* Map card — flex-1 to consume remaining vertical space so the page
-          fits the viewport without scrolling. */}
+          fits the viewport without scrolling. Cream gradient background to
+          match the Birdfolk paper look — states sit on this lightly tinted
+          background like a watercolor wash. */}
       <div
-        className="anim-4 rounded-2xl overflow-hidden relative flex-1 min-h-0 flex flex-col"
-        style={{ background: '#142926', border: '1px solid rgba(255,255,255,0.08)' }}
+        className="anim-4 overflow-hidden relative flex-1 min-h-0 flex flex-col"
+        style={{
+          background: 'linear-gradient(180deg, #f0fafb 0%, #fffaeb 100%)',
+          border: '3px solid #2a3445',
+          boxShadow: '0 4px 0 0 #2a3445',
+          borderRadius: 22,
+        }}
       >
 
         {/* map body — flex-1 itself so the SVG fills whatever space is left
@@ -4026,7 +4382,9 @@ function SightingsMapView({
                       <path
                         key={s.id}
                         d={activePath(s) || ''}
-                        fill={inActive ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.012)'}
+                        // Pale mint wash for active states, even paler for
+                        // inactive (out-of-region) so the active region pops
+                        fill={inActive ? '#c8e6c8' : 'rgba(200,230,200,0.30)'}
                         stroke="none"
                         onClick={clickable ? () => setRegion(rid) : undefined}
                         style={{ cursor: clickable ? 'pointer' : 'default' }}
@@ -4048,36 +4406,36 @@ function SightingsMapView({
                   ))}
                 </g>
 
-                {/* Internal state borders on top of heatmap */}
+                {/* Internal state borders — soft mint */}
                 <path
                   d={activePath(STATE_BORDERS) || ''}
                   fill="none"
-                  stroke="rgba(255,255,255,0.18)"
-                  strokeWidth={0.5}
+                  stroke="#7ab87a"
+                  strokeWidth={0.7}
                   strokeLinejoin="round"
                   pointerEvents="none"
                 />
 
-                {/* Region division borders — only on the full US view; thicker
-                    line so the 8 regions read as distinct tap-targets. */}
+                {/* Region division borders — only on the full US view. Coral
+                    dashed so they read as distinct tap-target dividers. */}
                 {!region && (
                   <path
                     d={activePath(REGION_BORDERS) || ''}
                     fill="none"
-                    stroke="rgba(251,146,60,0.35)"
+                    stroke="#ff9a76"
                     strokeWidth={1.4}
+                    strokeDasharray="4,2"
                     strokeLinejoin="round"
                     pointerEvents="none"
                   />
                 )}
 
-                {/* Outer border for the active scope. On full US that's the
-                    national outline; on a region, the region's own boundary. */}
+                {/* Outer border for the active scope — dark mint. */}
                 <path
                   d={activePath(activeOutline) || ''}
                   fill="none"
-                  stroke="rgba(255,255,255,0.4)"
-                  strokeWidth={1}
+                  stroke="#2e6b4f"
+                  strokeWidth={1.6}
                   strokeLinejoin="round"
                   pointerEvents="none"
                 />
@@ -4096,7 +4454,7 @@ function SightingsMapView({
                       })}
                     </linearGradient>
                   </defs>
-                  <rect x="0" y="0" width="160" height="12" fill="url(#legend-grad)" stroke="rgba(255,255,255,0.15)" strokeWidth="0.5" rx="2" />
+                  <rect x="0" y="0" width="160" height="12" fill="url(#legend-grad)" stroke="rgba(42,52,69,0.4)" strokeWidth="0.8" rx="6" />
                 </svg>
                 <span className="font-mono text-[10px] ink-faint tracking-widest uppercase">Many species</span>
               </div>

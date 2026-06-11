@@ -2,18 +2,138 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Make standalone PWA fill the viewport including safe areas */
+/* ===== App-wide tokens ====================================================
+   These CSS custom properties drive the Birdfolk look. They get used in
+   shadow-chunky utilities (via --shadow-color), in inline styles, and as
+   shortcuts for components that need values not easily expressed in
+   Tailwind's atomic classes. */
+:root {
+  --bg-sky-top:    #6cb8e4;
+  --bg-sky-mid:    #a8d8eb;
+  --bg-sky-bot:    #f8d9a8;
+  --surface:       #fff8e8;
+  --surface-warm:  #fff3d4;
+  --ink:           #2a3445;
+  --ink-mid:       #5a4a3e;
+  --ink-soft:      #7a6a55;
+  --coral:         #ff6b6b;
+  --coral-dark:    #a83a3a;
+  --sky:           #5fa8d3;
+  --sky-dark:      #2a5680;
+  --mint:          #5cba87;
+  --mint-dark:     #2e6b4f;
+  --sun:           #ffe066;
+  --sun-dark:      #c9a01a;
+}
+
+/* ===== Safe areas & overscroll =========================================== */
 html, body {
   height: 100%;
   margin: 0;
   padding: 0;
-  background: #f3ead8;
-  /* Prevent overscroll bounce showing white background on iOS */
+  /* Sky gradient body — sits behind everything when the app card is shorter
+     than the viewport. */
+  background:
+    linear-gradient(180deg, var(--bg-sky-top) 0%, var(--bg-sky-mid) 40%, var(--bg-sky-bot) 100%) fixed;
   overscroll-behavior-y: none;
+  font-family: 'Nunito', system-ui, sans-serif;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
 }
 #root {
   min-height: 100vh;
-  /* Account for iOS safe areas in standalone mode */
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
 }
+
+/* ===== Reusable Birdfolk components ======================================
+   These are component classes (composed with @apply) for the patterns that
+   show up everywhere: chunky cards, pill buttons, the 3D-button shadow.
+   Pulling them into shared classes keeps the App.jsx markup readable and
+   lets us tweak the look globally from one place. */
+@layer components {
+  /* Chunky card — the rounded white card with the offset dark shadow */
+  .bf-card {
+    @apply bg-white rounded-2xl;
+    border: 2.5px solid var(--ink);
+    box-shadow: 0 4px 0 0 var(--ink);
+  }
+  .bf-card-cream {
+    @apply rounded-2xl;
+    background: var(--surface);
+    border: 2.5px solid var(--ink);
+    box-shadow: 0 4px 0 0 var(--ink);
+  }
+  /* Pill button — the rounded full-pill button */
+  .bf-pill {
+    @apply inline-flex items-center justify-center gap-1.5 font-display font-semibold;
+    @apply rounded-full px-4 py-2 text-sm transition-transform active:translate-y-0.5;
+    background: #fff;
+    color: var(--ink);
+    border: 2.5px solid var(--ink);
+    box-shadow: 0 3px 0 0 var(--ink);
+  }
+  .bf-pill:active { box-shadow: 0 0 0 0 var(--ink); }
+  .bf-pill-coral {
+    background: var(--coral);
+    color: #fff;
+    border-color: var(--coral-dark);
+    box-shadow: 0 3px 0 0 var(--coral-dark);
+    text-shadow: 0 1.5px 0 var(--coral-dark);
+  }
+  .bf-pill-coral:active { box-shadow: 0 0 0 0 var(--coral-dark); }
+  .bf-pill-sky {
+    background: var(--sky);
+    color: #fff;
+    border-color: var(--sky-dark);
+    box-shadow: 0 3px 0 0 var(--sky-dark);
+    text-shadow: 0 1.5px 0 var(--sky-dark);
+  }
+  .bf-pill-sky:active { box-shadow: 0 0 0 0 var(--sky-dark); }
+  .bf-pill-mint {
+    background: var(--mint);
+    color: #fff;
+    border-color: var(--mint-dark);
+    box-shadow: 0 3px 0 0 var(--mint-dark);
+    text-shadow: 0 1.5px 0 var(--mint-dark);
+  }
+  .bf-pill-mint:active { box-shadow: 0 0 0 0 var(--mint-dark); }
+  /* Hero number with the colored drop-shadow text effect */
+  .bf-hero-num {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 0.92;
+    color: var(--coral);
+    text-shadow: 0 4px 0 var(--coral-dark);
+  }
+  /* Subtle dashed divider used inside cards */
+  .bf-divider {
+    border-top: 1.5px dashed rgba(42,52,69,0.25);
+  }
+}
+
+/* ===== Misc legacy carryovers ============================================
+   The current app's CSS includes a few utility classes referenced by name
+   throughout App.jsx (rust, moss, ink-faint, etc.). To avoid having to
+   rewrite every className in one go, we redefine the same class names with
+   palette-appropriate values. New code uses Tailwind colors directly. */
+.ink      { color: var(--ink) !important; }
+.ink-soft { color: var(--ink-mid) !important; }
+.ink-faint{ color: var(--ink-soft) !important; }
+.rust     { color: var(--coral) !important; }
+.moss     { color: var(--mint) !important; }
+.teal     { color: var(--sky) !important; }
+.rule     { border-color: rgba(42,52,69,0.18) !important; }
+.btn-ghost {
+  background: rgba(255,255,255,0.55);
+  border: 2px solid var(--ink);
+  color: var(--ink);
+}
+.btn-ink {
+  background: var(--ink);
+  color: var(--surface);
+  border: 2px solid var(--ink);
+}
+.font-display { font-family: 'Fredoka', system-ui, sans-serif; }
+.font-mono    { font-family: 'JetBrains Mono', ui-monospace, monospace; }
