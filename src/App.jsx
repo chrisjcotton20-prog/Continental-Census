@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import Papa from 'papaparse';
 import { Upload, RefreshCw, Settings, AlertCircle, Check, X, FileText, Feather, List, Search, Square, CheckSquare, Map as MapIcon, ChevronLeft, ChevronRight, Share2, Plus, Download } from 'lucide-react';
 import { storage } from './lib/storage.js';
-import { BluebirdMascot, Cardinal, Cloud, Sparkle, Compass, TreeIcon, HeartIcon, EyeIcon, CalendarIcon, BinocularsIcon } from './Illustrations.jsx';
+import { BluebirdMascot, Cardinal, Cloud, Sparkle, Compass, TreeIcon, HeartIcon, EyeIcon, CalendarIcon, ChecklistIcon } from './Illustrations.jsx';
 import { geoAlbersUsa, geoAlbers, geoPath, geoContains, geoCentroid } from 'd3-geo';
 import { contourDensity } from 'd3-contour';
 import { feature, mesh, merge } from 'topojson-client';
@@ -1846,7 +1846,7 @@ export default function BirdLifeTracker() {
                     textShadow: '0 1px 0 #2a5680',
                   }}
                 >
-                  YOUR LIFE LIST, MADE CUTE
+                  YOUR LIFE LIST
                 </p>
               </div>
             </div>
@@ -1955,21 +1955,28 @@ export default function BirdLifeTracker() {
 
         {!empty && hydrated && (
           <main>
-            {/* ===== Hero count card =====
-                A chunky white card containing the big "Life List" label pill,
-                the dramatic coral hero number with offset text-shadow (the
-                signature Animal Crossing menu-title look), the denominator,
-                and an inline progress bar with a rainbow fill.
+            {/* ===== Hero count card — TAPPABLE =====
+                The whole card is a button. Tap anywhere on it to open the
+                full species index. Visually identical to the previous div
+                version (chunky white card, coral hero number with offset
+                text-shadow, rainbow progress bar) — just rendered as a
+                <button> with text-align center and matching styles. A small
+                "tap to browse" microcopy sits beside the % complete line
+                so the affordance is discoverable without a chevron crowding
+                the hero number.
                 ===== */}
-            <div
-              className="anim-2 mb-5 relative"
+            <button
+              type="button"
+              onClick={openAllSpecies}
+              aria-label="Browse all 774 species"
+              className="anim-2 mb-5 relative w-full block text-center lift"
               style={{
                 background: 'linear-gradient(180deg, #fff 0%, #fff8e8 100%)',
                 border: '3px solid #2a3445',
                 boxShadow: '0 5px 0 0 #2a3445',
                 borderRadius: 22,
                 padding: '18px 20px 16px',
-                textAlign: 'center',
+                cursor: 'pointer',
               }}
             >
               {/* Star badge popping out of the top-right corner */}
@@ -2063,7 +2070,21 @@ export default function BirdLifeTracker() {
                 {' complete · '}
                 {remaining != null ? `${fmt(remaining)} to go!` : ''}
               </div>
-            </div>
+              {/* Tap-to-browse microcopy — small, low-key, sits inside the
+                  card so the button feels deliberate without an extra
+                  affordance fighting the hero number. */}
+              <div
+                className="font-sans inline-flex items-center justify-center gap-1.5 mt-2"
+                style={{
+                  fontWeight: 700, fontSize: 10, color: '#7a6a55',
+                  letterSpacing: '0.08em', textTransform: 'uppercase',
+                  opacity: 0.75,
+                }}
+              >
+                <List size={11} strokeWidth={2.5} />
+                Tap to browse the full list
+              </div>
+            </button>
 
             {/* "Your collection" section title with yellow accent dot */}
             <div className="anim-5 mb-2 mt-1 flex items-center gap-2">
@@ -2094,7 +2115,7 @@ export default function BirdLifeTracker() {
                 }}
               >
                 <div className="flex items-start gap-2">
-                  <BinocularsIcon size={32} className="flex-shrink-0" />
+                  <ChecklistIcon size={32} className="flex-shrink-0" />
                   <div>
                     <div className="font-display" style={{ fontWeight: 600, fontSize: 11, color: '#5a4a3e', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
                       Sightings
@@ -2188,16 +2209,11 @@ export default function BirdLifeTracker() {
               </div>
             </div>
 
-            {/* ===== Tertiary action buttons row =====
-                Browse-all and find-missed-birds — chunky pill buttons */}
+            {/* ===== Tertiary action row — Find Missed Birds =====
+                Browse-all moved up under the hero. This row now holds only
+                the eBird-API-powered "find missed birds" affordance (and any
+                future tools we add). */}
             <div className="anim-5 flex flex-wrap items-center gap-2 mb-4">
-              <button
-                onClick={openAllSpecies}
-                className="btn-ghost rounded-full px-4 py-2 text-sm inline-flex items-center gap-2"
-              >
-                <List size={14} strokeWidth={2.5} />
-                Browse all {TOTAL}
-              </button>
               {userCount != null && (
                 <button
                   onClick={() => setShowTips(true)}
@@ -2749,21 +2765,40 @@ function SpeciesListDrawer({ seenSci, onClose, title, subtitle, eyebrow, restric
                 const famSeen = items.filter(([, s]) => seenSci.has(s)).length;
                 return (
                   <section key={family} className="mb-1">
-                    {/* family subheader — hidden when the whole drawer is one family */}
+                    {/* family subheader — hidden when the whole drawer is one family.
+                        Cream sticky band with a yellow accent dot prefix, dark ink
+                        text. The previous dark-green background was a holdover from
+                        the legacy palette and looked wrong against the cream drawer. */}
                     {!hideFamilyHeader && (
                       <>
-                        <div className="sticky top-0 z-10 px-3 py-2 flex items-baseline justify-between gap-3" style={{ background: 'rgba(20, 41, 38, 0.95)', backdropFilter: 'blur(8px)' }}>
-                          <h3 className="font-display ink text-base sm:text-lg" style={{ fontWeight: 600 }}>
-                            {family}
-                          </h3>
+                        <div
+                          className="sticky top-0 z-10 px-3 py-2.5 flex items-center justify-between gap-3"
+                          style={{
+                            background: 'rgba(255,248,232,0.96)',
+                            backdropFilter: 'blur(8px)',
+                            borderBottom: '1.5px solid rgba(42,52,69,0.18)',
+                          }}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              className="shrink-0"
+                              style={{
+                                width: 10, height: 10, borderRadius: '50%',
+                                background: '#ffe066', border: '2px solid #c9a01a',
+                              }}
+                            />
+                            <h3 className="font-display text-base sm:text-lg truncate" style={{ fontWeight: 600, color: '#2a3445' }}>
+                              {family}
+                            </h3>
+                          </div>
                           <span
-                            className="font-mono text-[11px] ink-soft tracking-wider whitespace-nowrap"
-                            style={{ fontWeight: 600 }}
+                            className="font-mono text-[11px] tracking-wider whitespace-nowrap shrink-0"
+                            style={{ fontWeight: 700, color: '#5a4a3e' }}
                           >
-                            {famSeen} / {items.length}
+                            <span style={{ color: famSeen > 0 ? '#ff6b6b' : '#7a6a55' }}>{famSeen}</span>
+                            <span style={{ color: '#7a6a55' }}> / {items.length}</span>
                           </span>
                         </div>
-                        <div className="border-t mx-3 mb-1" style={{ borderColor: 'rgba(255,255,255,0.06)' }} />
                       </>
                     )}
                     <ul>
@@ -2771,20 +2806,20 @@ function SpeciesListDrawer({ seenSci, onClose, title, subtitle, eyebrow, restric
                         const seen = seenSci.has(sci);
                         const iucn = IUCN_STATUS[sci];
                         const badgeColor =
-                          iucn === 'CR' ? '#f87171' :
-                          iucn === 'EN' ? '#fb923c' :
-                          iucn === 'VU' ? '#fbbf24' :
-                          '#a8b1ae'; // NT
+                          iucn === 'CR' ? '#a83a3a' :
+                          iucn === 'EN' ? '#ff6b6b' :
+                          iucn === 'VU' ? '#c9a01a' :
+                          '#7a6a55'; // NT
                         return (
                           <li
                             key={sci}
                             className="species-row flex items-center gap-3 px-3 py-2.5 border-b"
-                            style={{ borderColor: 'rgba(255,255,255,0.04)' }}
+                            style={{ borderColor: 'rgba(42,52,69,0.08)' }}
                           >
                             {seen ? (
-                              <CheckSquare size={22} strokeWidth={1.75} className="moss shrink-0" />
+                              <CheckSquare size={22} strokeWidth={2} className="shrink-0" style={{ color: '#5cba87' }} />
                             ) : (
-                              <Square size={22} strokeWidth={1.5} className="ink-faint shrink-0" />
+                              <Square size={22} strokeWidth={1.5} className="shrink-0" style={{ color: '#a8a294' }} />
                             )}
                             <div className="flex-1 min-w-0">
                               <div
@@ -3633,16 +3668,22 @@ const REGION_PROJ_FN = {
 // a hard 60%-alpha edge.
 function heatColor(t) {
   t = Math.max(0, Math.min(1, t));
-  // Birdfolk sunset ramp — cream transparent fringe blooming through warm
-  // yellow, peach, coral, and a hot pink-red core. Calibrated to read clearly
-  // against the pale mint basemap and the cream card behind the map.
+  // Birdfolk heat ramp tuned for the pale mint basemap (#c8e6c8).
+  //
+  // The earlier ramp started at pale sunshine yellow, which sat at almost
+  // the same brightness as mint and faded out visually. This version skips
+  // pale yellow entirely and starts at a saturated amber, then rolls through
+  // warm coral into a deep magenta-red core. Pink/magenta sits opposite
+  // green on the color wheel, so the high-density blobs hit maximum contrast
+  // against the mint states, and the warm amber low end has enough chroma
+  // to stay legible at low opacity.
   const stops = [
-    { at: 0.00, c: [255, 245, 225, 0.00] }, // transparent cream fringe
-    { at: 0.15, c: [255, 224, 102, 0.45] }, // soft sunshine yellow
-    { at: 0.35, c: [255, 184, 110, 0.65] }, // amber peach
-    { at: 0.55, c: [255, 154, 118, 0.75] }, // warm peach
-    { at: 0.75, c: [255, 107, 107, 0.85] }, // coral
-    { at: 1.00, c: [201,  54,  54, 0.92] }, // hot pink-red core
+    { at: 0.00, c: [255, 240, 210, 0.00] }, // transparent warm cream fringe
+    { at: 0.12, c: [245, 162,  55, 0.60] }, // saturated amber — visible on mint
+    { at: 0.32, c: [240, 110,  85, 0.75] }, // warm pink-orange
+    { at: 0.55, c: [232,  80,  95, 0.85] }, // coral red
+    { at: 0.78, c: [200,  50, 110, 0.90] }, // deep magenta-red
+    { at: 1.00, c: [140,  30,  70, 0.94] }, // burgundy core
   ];
   for (let i = 1; i < stops.length; i++) {
     if (t <= stops[i].at) {

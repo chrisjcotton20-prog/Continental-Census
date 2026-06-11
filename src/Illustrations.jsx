@@ -154,17 +154,30 @@ export function CalendarIcon({ size = 32, className = '' }) {
   );
 }
 
-export function BinocularsIcon({ size = 32, className = '' }) {
-  // Used for the "Observations" stat tile — pairs of binoculars
+export function ChecklistIcon({ size = 32, className = '' }) {
+  // Clipboard with a checkmark — used for the "Sightings" stat tile.
+  // Symbolic for "things I've logged" / "items checked off my list".
+  // Replaces an earlier binoculars icon whose two-circles-with-bridge
+  // composition could read as something other than birding equipment.
   return (
-    <svg viewBox="0 0 40 40" width={size} height={size} className={className} xmlns="http://www.w3.org/2000/svg">
-      <circle cx="12" cy="22" r="8" fill="#5fa8d3" stroke="#2a5680" strokeWidth="2.2" />
-      <circle cx="28" cy="22" r="8" fill="#5fa8d3" stroke="#2a5680" strokeWidth="2.2" />
-      <circle cx="12" cy="22" r="4" fill="#fff8e8" stroke="#2a5680" strokeWidth="1.4" />
-      <circle cx="28" cy="22" r="4" fill="#fff8e8" stroke="#2a5680" strokeWidth="1.4" />
-      <path d="M16 16 L24 16" stroke="#2a3445" strokeWidth="3.5" strokeLinecap="round" />
-      <path d="M10 14 L8 8" stroke="#2a5680" strokeWidth="2" strokeLinecap="round" />
-      <path d="M30 14 L32 8" stroke="#2a5680" strokeWidth="2" strokeLinecap="round" />
+    <svg viewBox="0 0 40 44" width={size} height={size * 44 / 40} className={className} xmlns="http://www.w3.org/2000/svg">
+      {/* clipboard body */}
+      <rect x="5" y="8" width="30" height="32" rx="3.5" fill="#fff" stroke="#2a5680" strokeWidth="2.2" />
+      {/* clip at top */}
+      <rect x="13" y="3" width="14" height="8" rx="2" fill="#5fa8d3" stroke="#2a5680" strokeWidth="2" />
+      <rect x="16" y="5" width="8" height="3" rx="1" fill="#fff" />
+      {/* list lines */}
+      <line x1="11" y1="20" x2="29" y2="20" stroke="#a8c8e0" strokeWidth="1.8" strokeLinecap="round" />
+      <line x1="11" y1="27" x2="25" y2="27" stroke="#a8c8e0" strokeWidth="1.8" strokeLinecap="round" />
+      <line x1="11" y1="34" x2="29" y2="34" stroke="#a8c8e0" strokeWidth="1.8" strokeLinecap="round" />
+      {/* green checkmark on the first line — the "logged sighting" mark */}
+      <path d="M11 19 L14 22 L19 17" fill="none" stroke="#5cba87" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
+}
+
+export function BinocularsIcon({ size = 32, className = '' }) {
+  // Legacy export kept for any external references — points at ChecklistIcon
+  // so renames don't break anything that imported the old name.
+  return <ChecklistIcon size={size} className={className} />;
 }

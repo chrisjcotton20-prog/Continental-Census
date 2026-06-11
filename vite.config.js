@@ -11,7 +11,7 @@ export default defineConfig({
       manifest: {
         name: 'Birder',
         short_name: 'Birder',
-        description: 'Your life list, made cute. Track your eBird sightings against the 774 native US bird species.',
+        description: 'Your Life List. Track your eBird sightings against the 774 native US bird species.',
         theme_color: '#a8d8eb',
         background_color: '#fff8e8',
         display: 'standalone',
