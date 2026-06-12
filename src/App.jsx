@@ -3666,6 +3666,51 @@ const REGION_PROJ_FN = {
 // `t` in [0, 1]. The lowest stop is fully transparent so the outer fringe of
 // each hotspot fades naturally into the map background instead of stopping at
 // a hard 60%-alpha edge.
+// Number of overlapping weight-1 (single-species) sites at which the
+// colormap saturates to "dark red core." Bigger value → harder to reach
+// the hot end (more cluster build-up needed). Smaller → easier to reach.
+//
+// 6 picks a sweet spot: a small cluster of ~3 single-species sites lands
+// in the warm range, ~6 hits saturation, and beyond that everything
+// clamps. Tune up if your hotspots feel too saturated; tune down if the
+// hot end is too hard to reach.
+const HEATMAP_SATURATION_N = 6;
+
+// Compress a density value to a 0..1 colormap position. Uses an ABSOLUTE
+// reference (single-point density × HEATMAP_SATURATION_N) rather than a
+// ratio against the current max, which makes the rendering scale-stable
+// as the user's data grows.
+//
+// Why an absolute reference: with the obvious `value / maxValue` approach,
+// a kernel density hotspot at Charlotte (multiple sites within bandwidth
+// overlapping into a cluster) climbs as the user adds more nearby
+// checklists. That pushes `maxValue` up, which pushes isolated single-
+// visit spots' ratios down — even though those spots haven't changed at
+// all. Any exponent tweak (sqrt, cube root, etc.) only delays the
+// problem; the bottom of the spectrum keeps drifting down as the top
+// climbs.
+//
+// The fix is to stop normalizing against the current max. Instead we
+// pick a stable reference — the density a single weight-1 point produces
+// at its own center, which depends only on bandwidth/cellSize (constants
+// we control, not on the data). The colormap saturates at N× that
+// reference. Hotter clusters all clamp to dark-red; isolated points
+// stay at the same position on the spectrum forever.
+//
+// `singlePointRef` is calibrated per render by running contourDensity on
+// a single synthetic weight-1 point at the same bandwidth/cellSize used
+// for the real contours. This makes the calibration valid even when the
+// projection scale changes (e.g. switching to Alaska or Hawaii views).
+//
+// After ratio is clamped to [0, 1], sqrt is applied so the low end gets
+// a visibility boost while the top stays at full saturation.
+function densityT(value, singlePointRef) {
+  if (singlePointRef <= 0) return 0;
+  const cap = singlePointRef * HEATMAP_SATURATION_N;
+  const r = Math.max(0, Math.min(1, value / cap));
+  return Math.pow(r, 0.5);
+}
+
 function heatColor(t) {
   t = Math.max(0, Math.min(1, t));
   // Classic thermal-imaging ramp: blue → green → yellow → orange → dark red.
@@ -3852,7 +3897,7 @@ function SightingsMapView({
   // weight is unique species count at that location. When zoomed to a region,
   // points are first filtered to those inside the region's geometry so the
   // density contours represent only that region's data.
-  const { contours, projectedCount, maxValue, totalSpeciesAcrossLocations, totalLocations } = useMemo(() => {
+  const { contours, projectedCount, maxValue, singlePointRef, totalSpeciesAcrossLocations, totalLocations } = useMemo(() => {
     const projected = [];
     let totalW = 0;
     const regionGeo = region ? REGION_GEOMETRY[region] : null;
@@ -3869,8 +3914,52 @@ function SightingsMapView({
       }
     }
     if (projected.length === 0) {
-      return { contours: [], projectedCount: 0, maxValue: 0, totalSpeciesAcrossLocations: 0, totalLocations: 0 };
+      return { contours: [], projectedCount: 0, maxValue: 0, singlePointRef: 0, totalSpeciesAcrossLocations: 0, totalLocations: 0 };
     }
+
+    // Step 1: calibrate the per-point reference density.
+    // Run the same kernel estimator on a single synthetic weight-1 point
+    // at the center of the viewBox to find the peak density that one
+    // isolated single-species point produces. This becomes our stable
+    // unit of measure — adding more clusters elsewhere doesn't change
+    // this value, so it makes a solid foundation for the colormap.
+    //
+    // We use a high threshold count here so the last contour level lands
+    // close to the actual peak density, not a coarse approximation.
+    const calCs = contourDensity()
+      .x((d) => d[0])
+      .y((d) => d[1])
+      .weight((d) => Math.sqrt(d[2]))
+      .size([viewBoxW, viewBoxH])
+      .cellSize(2)
+      .bandwidth(5)
+      .thresholds(40)([[viewBoxW / 2, viewBoxH / 2, 1]]);
+    const singlePointRef = calCs.length ? calCs[calCs.length - 1].value : 0.001;
+
+    // Step 2: define FIXED density thresholds tied to singlePointRef.
+    // d3-contour's default `thresholds(n)` generates n evenly-spaced
+    // levels across the data's full range — which adapts to data so that
+    // contours redistribute across whatever range exists. That sounds
+    // good but fails our use case: when a cluster's peak density is much
+    // larger than an isolated point's density, the lowest auto-threshold
+    // can be HIGHER than an isolated point's peak, so the isolated point
+    // generates no contours at all.
+    //
+    // By fixing thresholds at multiples of singlePointRef, we guarantee
+    // every density level always has the same meaning:
+    //   - At 0.3× ref: edge of a single isolated weight-1 point
+    //   - At 1× ref: peak of an isolated point
+    //   - At 6× ref (SATURATION_N): "fully saturated red"
+    //   - Above 6×: still red, but extra rings give visual depth inside
+    //     dense clusters
+    // 28 thresholds spread across this range give us smooth color
+    // gradients with detail at both ends.
+    const tHi = singlePointRef * HEATMAP_SATURATION_N * 2;
+    const tLo = singlePointRef * 0.3;
+    const thresholds = Array.from({ length: 28 }, (_, i) =>
+      tLo + (tHi - tLo) * (i / 27)
+    );
+
     const dc = contourDensity()
       .x((d) => d[0])
       .y((d) => d[1])
@@ -3878,13 +3967,15 @@ function SightingsMapView({
       .size([viewBoxW, viewBoxH])
       .cellSize(2)
       .bandwidth(5)
-      .thresholds(28);
+      .thresholds(thresholds);
     const cs = dc(projected);
     const maxV = cs.length ? cs[cs.length - 1].value : 0;
+
     return {
       contours: cs,
       projectedCount: projected.length,
       maxValue: maxV,
+      singlePointRef,
       totalSpeciesAcrossLocations: totalW,
       totalLocations: projected.length,
     };
@@ -4447,7 +4538,7 @@ function SightingsMapView({
                     <path
                       key={i}
                       d={PIXEL_PATH(c) || ''}
-                      fill={heatColor(maxValue > 0 ? c.value / maxValue : 0)}
+                      fill={heatColor(densityT(c.value, singlePointRef))}
                       stroke="none"
                     />
                   ))}
