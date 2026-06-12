@@ -3667,8 +3667,8 @@ const REGION_PROJ_FN = {
 // each hotspot fades naturally into the map background instead of stopping at
 // a hard 60%-alpha edge.
 // Number of overlapping weight-1 (single-species) sites at which the
-// colormap saturates to "dark red core." Bigger value → harder to reach
-// the hot end (more cluster build-up needed). Smaller → easier to reach.
+// colormap saturates to the hot end. Bigger value → harder to reach the
+// hot end (more cluster build-up needed). Smaller → easier to reach.
 //
 // 6 picks a sweet spot: a small cluster of ~3 single-species sites lands
 // in the warm range, ~6 hits saturation, and beyond that everything
@@ -3676,39 +3676,38 @@ const REGION_PROJ_FN = {
 // hot end is too hard to reach.
 const HEATMAP_SATURATION_N = 6;
 
-// Compress a density value to a 0..1 colormap position. Uses an ABSOLUTE
-// reference (single-point density × HEATMAP_SATURATION_N) rather than a
-// ratio against the current max, which makes the rendering scale-stable
-// as the user's data grows.
+// Floor anchor: the smallest visible blob always renders at this point on
+// the colormap. 0.20 lands solidly inside the visible blue band of
+// heatColor (which starts fading in around t=0.10). So a single-visit
+// site is always a clear blue dot — never a barely-there ghost.
+const HEATMAP_MIN_T = 0.20;
+
+// Compress a density value to a 0..1 colormap position using a linear
+// interpolation between an explicit floor and an explicit cap:
 //
-// Why an absolute reference: with the obvious `value / maxValue` approach,
-// a kernel density hotspot at Charlotte (multiple sites within bandwidth
-// overlapping into a cluster) climbs as the user adds more nearby
-// checklists. That pushes `maxValue` up, which pushes isolated single-
-// visit spots' ratios down — even though those spots haven't changed at
-// all. Any exponent tweak (sqrt, cube root, etc.) only delays the
-// problem; the bottom of the spectrum keeps drifting down as the top
-// climbs.
+//   value ≤ floor → HEATMAP_MIN_T  (clear blue — minimum visibility)
+//   value ≥ cap   → 1.0            (max color — saturated)
+//   between       → linear interp from HEATMAP_MIN_T to 1.0
 //
-// The fix is to stop normalizing against the current max. Instead we
-// pick a stable reference — the density a single weight-1 point produces
-// at its own center, which depends only on bandwidth/cellSize (constants
-// we control, not on the data). The colormap saturates at N× that
-// reference. Hotter clusters all clamp to dark-red; isolated points
-// stay at the same position on the spectrum forever.
+// The floor is tied to singlePointRef (the density a single weight-1 point
+// produces), which is a stable absolute reference. This is what makes the
+// rendering scale-stable as the user's data grows: a single isolated point
+// always lands at the same place on the spectrum regardless of how dense
+// the user's hotspots become.
 //
-// `singlePointRef` is calibrated per render by running contourDensity on
-// a single synthetic weight-1 point at the same bandwidth/cellSize used
-// for the real contours. This makes the calibration valid even when the
-// projection scale changes (e.g. switching to Alaska or Hawaii views).
-//
-// After ratio is clamped to [0, 1], sqrt is applied so the low end gets
-// a visibility boost while the top stays at full saturation.
+// Why linear instead of sqrt: sqrt compresses the low end (everything
+// jumps quickly into mid-blue/green territory) which can make moderate
+// clusters look hotter than they should. Linear scaling preserves the
+// intuition that "twice the density = twice as far up the spectrum."
 function densityT(value, singlePointRef) {
   if (singlePointRef <= 0) return 0;
-  const cap = singlePointRef * HEATMAP_SATURATION_N;
-  const r = Math.max(0, Math.min(1, value / cap));
-  return Math.pow(r, 0.5);
+  // Floor: matches the lowest contour threshold below, so the faintest
+  // visible blob is always exactly at HEATMAP_MIN_T (clear blue).
+  const floor = singlePointRef * 0.3;
+  const cap   = singlePointRef * HEATMAP_SATURATION_N;
+  if (value <= floor) return HEATMAP_MIN_T;
+  if (value >= cap)   return 1.0;
+  return HEATMAP_MIN_T + (1 - HEATMAP_MIN_T) * (value - floor) / (cap - floor);
 }
 
 function heatColor(t) {
@@ -3734,7 +3733,7 @@ function heatColor(t) {
     { at: 0.42, c: [ 50, 160, 100, 0.78] }, // saturated green
     { at: 0.60, c: [225, 195,  55, 0.88] }, // yellow
     { at: 0.80, c: [232, 130,  45, 0.92] }, // orange
-    { at: 1.00, c: [135,  25,  25, 0.95] }, // dark red core
+    { at: 1.00, c: [232,  55, 110, 0.95] }, // saturated bright pink-red core
   ];
   for (let i = 1; i < stops.length; i++) {
     if (t <= stops[i].at) {
