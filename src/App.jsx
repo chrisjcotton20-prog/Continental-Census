@@ -1397,7 +1397,10 @@ export default function BirdLifeTracker() {
   const [isInstalled, setIsInstalled] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [progressAnim, setProgressAnim] = useState(0);
-  const fileRef = useRef(null);
+  // File-picker refs are no longer needed: the upload UI uses a <label>
+  // wrapping a hidden but functional <input type="file"> so iOS Safari
+  // standalone-PWA can open the picker via a native tap on the label
+  // (programmatic .click() on a display:none input was unreliable there).
 
   // Detect "already installed" state on mount + when display-mode changes.
   useEffect(() => {
@@ -1961,21 +1964,35 @@ export default function BirdLifeTracker() {
                   At <span className="font-mono text-xs ink">ebird.org</span>: My eBird → Download My Data.
                   You'll be emailed a CSV — upload it here.
                 </p>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept=".csv,text/csv"
-                  className="hidden"
-                  onChange={(e) => onCsvFile(e.target.files?.[0])}
-                />
-                <button
-                  className="btn-ink rounded-full px-5 py-2.5 text-sm flex items-center gap-2"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={loading}
+                {/* Upload CSV — uses a <label>-wraps-<input> pattern instead of
+                    a hidden input + JS .click(). Reason: iOS Safari standalone
+                    PWAs are unreliable at opening the file picker when the
+                    underlying input is display:none and the click is fired
+                    programmatically. The picker either fails to open or
+                    returns the user to a blank gray screen. A <label>
+                    wrapping a visually-hidden input lets iOS open the picker
+                    natively via the tap on the label, which always works.
+                    The input uses off-screen positioning (not display:none)
+                    so iOS still treats it as a live element. */}
+                <label
+                  className="btn-ink rounded-full px-5 py-2.5 text-sm inline-flex items-center gap-2"
+                  style={loading ? { pointerEvents: 'none', opacity: 0.6 } : { cursor: 'pointer' }}
                 >
                   {loading ? <RefreshCw size={14} className="animate-spin" /> : <Upload size={14} />}
                   {loading ? 'Reading…' : 'Upload CSV'}
-                </button>
+                  <input
+                    type="file"
+                    accept=".csv,text/csv,text/plain,application/vnd.ms-excel"
+                    onChange={(e) => { onCsvFile(e.target.files?.[0]); e.target.value = ''; }}
+                    disabled={loading}
+                    style={{
+                      position: 'absolute',
+                      width: 1, height: 1, padding: 0, margin: -1,
+                      overflow: 'hidden', clip: 'rect(0,0,0,0)',
+                      whiteSpace: 'nowrap', border: 0,
+                    }}
+                  />
+                </label>
               </div>
             </div>
 
@@ -2353,21 +2370,26 @@ export default function BirdLifeTracker() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept=".csv,text/csv"
-                  className="hidden"
-                  onChange={(e) => onCsvFile(e.target.files?.[0])}
-                />
-                <button
-                  className="btn-ghost rounded-full px-3.5 py-2 text-xs flex items-center gap-1.5"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={loading}
+                {/* Re-upload CSV — see note above on the label/input pattern. */}
+                <label
+                  className="btn-ghost rounded-full px-3.5 py-2 text-xs inline-flex items-center gap-1.5"
+                  style={loading ? { pointerEvents: 'none', opacity: 0.6 } : { cursor: 'pointer' }}
                 >
                   {loading ? <RefreshCw size={12} className="animate-spin" /> : <Upload size={12} />}
                   Re-upload CSV
-                </button>
+                  <input
+                    type="file"
+                    accept=".csv,text/csv,text/plain,application/vnd.ms-excel"
+                    onChange={(e) => { onCsvFile(e.target.files?.[0]); e.target.value = ''; }}
+                    disabled={loading}
+                    style={{
+                      position: 'absolute',
+                      width: 1, height: 1, padding: 0, margin: -1,
+                      overflow: 'hidden', clip: 'rect(0,0,0,0)',
+                      whiteSpace: 'nowrap', border: 0,
+                    }}
+                  />
+                </label>
               </div>
             </div>
           </main>
@@ -2470,9 +2492,9 @@ export default function BirdLifeTracker() {
               <span className="font-mono text-[10px] ink-faint tracking-widest uppercase block mb-2">Re-upload CSV</span>
               <input
                 type="file"
-                accept=".csv,text/csv"
+                accept=".csv,text/csv,text/plain,application/vnd.ms-excel"
                 className="text-xs ink-soft block w-full file:mr-3 file:px-3 file:py-1.5 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-[#ff6b6b] file:text-white file:cursor-pointer hover:file:bg-[#ff8888]"
-                onChange={(e) => onCsvFile(e.target.files?.[0])}
+                onChange={(e) => { onCsvFile(e.target.files?.[0]); e.target.value = ''; }}
               />
               {csvMeta && (
                 <span className="text-xs ink-faint mt-2 block">
