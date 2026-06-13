@@ -3789,18 +3789,18 @@ const HEATMAP_MIN_T = 0.20;
 // always lands at the same place on the spectrum regardless of how dense
 // the user's hotspots become.
 //
-// Why squared compression on the normalized interval: linear scaling makes
+// Why cubic compression on the normalized interval: linear scaling makes
 // the middle of the band (50% of the way to cap) land at green-yellow,
-// and clusters of just a few overlapping sites already hit warm colors.
-// Squaring pulls the middle of the band DOWN toward blue/green, so the
-// hot pink-red core is reserved for the densest peaks — a 50%-of-cap
-// value renders as t=0.40 (green) instead of t=0.60 (yellow). Both
+// and squared makes it land at blue-green. Cubic pulls the middle of the
+// band even further DOWN toward blue, so the hot pink-red core is
+// reserved only for the very densest peaks. A 50%-of-cap value renders
+// at t=0.30 (blue) instead of t=0.40 (green) or t=0.60 (yellow). Both
 // endpoints stay anchored: floor → blue, cap → max color, so the
 // scale-stable behavior is preserved.
 //
-// To make red even rarer: bump the exponent (Math.pow(r, 3) for cubed,
-// Math.pow(r, 4) for quartic). Higher exponent = more cluster density
-// needed to hit the warm range.
+// Tuning the exponent: r*r (squared) gives a moderate cool-bias, r*r*r
+// (cubic, current) gives a strong cool-bias, Math.pow(r, 4) gives an
+// extreme cool-bias where only the absolute hottest peaks reach red.
 function densityT(value, singlePointRef) {
   if (singlePointRef <= 0) return 0;
   const floor = singlePointRef * 0.3;
@@ -3808,7 +3808,7 @@ function densityT(value, singlePointRef) {
   if (value <= floor) return HEATMAP_MIN_T;
   if (value >= cap)   return 1.0;
   const r = (value - floor) / (cap - floor);  // 0..1 inside the band
-  return HEATMAP_MIN_T + (1 - HEATMAP_MIN_T) * r * r;
+  return HEATMAP_MIN_T + (1 - HEATMAP_MIN_T) * r * r * r;
 }
 
 function heatColor(t) {
@@ -4032,7 +4032,7 @@ function SightingsMapView({
       .weight((d) => Math.sqrt(d[2]))
       .size([viewBoxW, viewBoxH])
       .cellSize(2)
-      .bandwidth(5)
+      .bandwidth(4)
       .thresholds(40)([[viewBoxW / 2, viewBoxH / 2, 1]]);
     const singlePointRef = calCs.length ? calCs[calCs.length - 1].value : 0.001;
 
@@ -4052,12 +4052,14 @@ function SightingsMapView({
     //   - At 6× ref (SATURATION_N): "fully saturated red"
     //   - Above 6×: still red, but extra rings give visual depth inside
     //     dense clusters
-    // 28 thresholds spread across this range give us smooth color
-    // gradients with detail at both ends.
+    // 40 thresholds (was 28) spread across this range give us smooth color
+    // gradients with detail at both ends — bumped so the cubic compression
+    // doesn't show visible banding in the long blue/green portion of the
+    // ramp where many contour lines now cluster.
     const tHi = singlePointRef * HEATMAP_SATURATION_N * 2;
     const tLo = singlePointRef * 0.3;
-    const thresholds = Array.from({ length: 28 }, (_, i) =>
-      tLo + (tHi - tLo) * (i / 27)
+    const thresholds = Array.from({ length: 40 }, (_, i) =>
+      tLo + (tHi - tLo) * (i / 39)
     );
 
     const dc = contourDensity()
@@ -4066,7 +4068,7 @@ function SightingsMapView({
       .weight((d) => Math.sqrt(d[2]))
       .size([viewBoxW, viewBoxH])
       .cellSize(2)
-      .bandwidth(5)
+      .bandwidth(4)
       .thresholds(thresholds);
     const cs = dc(projected);
     const maxV = cs.length ? cs[cs.length - 1].value : 0;
