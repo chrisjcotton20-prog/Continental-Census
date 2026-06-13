@@ -3695,19 +3695,26 @@ const HEATMAP_MIN_T = 0.20;
 // always lands at the same place on the spectrum regardless of how dense
 // the user's hotspots become.
 //
-// Why linear instead of sqrt: sqrt compresses the low end (everything
-// jumps quickly into mid-blue/green territory) which can make moderate
-// clusters look hotter than they should. Linear scaling preserves the
-// intuition that "twice the density = twice as far up the spectrum."
+// Why squared compression on the normalized interval: linear scaling makes
+// the middle of the band (50% of the way to cap) land at green-yellow,
+// and clusters of just a few overlapping sites already hit warm colors.
+// Squaring pulls the middle of the band DOWN toward blue/green, so the
+// hot pink-red core is reserved for the densest peaks — a 50%-of-cap
+// value renders as t=0.40 (green) instead of t=0.60 (yellow). Both
+// endpoints stay anchored: floor → blue, cap → max color, so the
+// scale-stable behavior is preserved.
+//
+// To make red even rarer: bump the exponent (Math.pow(r, 3) for cubed,
+// Math.pow(r, 4) for quartic). Higher exponent = more cluster density
+// needed to hit the warm range.
 function densityT(value, singlePointRef) {
   if (singlePointRef <= 0) return 0;
-  // Floor: matches the lowest contour threshold below, so the faintest
-  // visible blob is always exactly at HEATMAP_MIN_T (clear blue).
   const floor = singlePointRef * 0.3;
   const cap   = singlePointRef * HEATMAP_SATURATION_N;
   if (value <= floor) return HEATMAP_MIN_T;
   if (value >= cap)   return 1.0;
-  return HEATMAP_MIN_T + (1 - HEATMAP_MIN_T) * (value - floor) / (cap - floor);
+  const r = (value - floor) / (cap - floor);  // 0..1 inside the band
+  return HEATMAP_MIN_T + (1 - HEATMAP_MIN_T) * r * r;
 }
 
 function heatColor(t) {
