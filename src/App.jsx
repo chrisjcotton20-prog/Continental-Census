@@ -1485,26 +1485,78 @@ export default function BirdLifeTracker() {
   }
 
   // hydrate from storage
+  //
+  // Three safety mechanisms against the "stuck on loading screen" failure
+  // mode (reported intermittently, especially on iOS Safari):
+  //
+  //   1. Promise.allSettled instead of Promise.all — if a single storage.get
+  //      rejects (corrupt value, quota error), the other reads still
+  //      complete and hydration continues. Without this, one bad key
+  //      blocked all the others.
+  //
+  //   2. try/finally around the whole IIFE — guarantees setHydrated(true)
+  //      runs no matter what throws inside. The previous version had no
+  //      catch, so any unexpected exception left the splash visible
+  //      forever with no error surface.
+  //
+  //   3. 8-second watchdog timer — IndexedDB can hang indefinitely on
+  //      iOS Safari when private browsing is on, when a Service Worker is
+  //      mid-upgrade, or in low-memory situations. The watchdog
+  //      force-hydrates after the timeout so the user always lands on the
+  //      home screen — they may be in the "empty" state (since no data
+  //      was read), but they can re-upload their CSV. Better than a
+  //      permanent loading screen.
   useEffect(() => {
+    let cancelled = false;
+
+    // 8s watchdog: if hydration hasn't finished by then, force the splash
+    // to dismiss. Storage reads either finished or got stuck — either way
+    // continuing with whatever we have is better than hanging forever.
+    const watchdog = setTimeout(() => {
+      if (!cancelled) setHydrated(true);
+    }, 8000);
+
     (async () => {
-      const [u, m, s, p, fp, l, k] = await Promise.all([
-        storage.get(STORAGE.userCount),
-        storage.get(STORAGE.csvMeta),
-        storage.get(STORAGE.seenSci),
-        storage.get(STORAGE.points),
-        storage.get(STORAGE.firstSightingPoints),
-        storage.get(STORAGE.locations),
-        storage.get(STORAGE.apiKey),
-      ]);
-      if (u) setUserCount(parseInt(u, 10));
-      if (m) { try { setCsvMeta(JSON.parse(m)); } catch {} }
-      if (s) { try { setSeenSci(new Set(JSON.parse(s))); } catch {} }
-      if (p) { try { setPoints(JSON.parse(p)); } catch {} }
-      if (fp) { try { setFirstSightingPoints(JSON.parse(fp)); } catch {} }
-      if (l) { try { setLocations(JSON.parse(l)); } catch {} }
-      if (k) setApiKey(k);
-      setHydrated(true);
+      try {
+        const results = await Promise.allSettled([
+          storage.get(STORAGE.userCount),
+          storage.get(STORAGE.csvMeta),
+          storage.get(STORAGE.seenSci),
+          storage.get(STORAGE.points),
+          storage.get(STORAGE.firstSightingPoints),
+          storage.get(STORAGE.locations),
+          storage.get(STORAGE.apiKey),
+        ]);
+        if (cancelled) return;
+
+        // Pull values out of settled-results — `null` for any rejection or
+        // missing key. Each setter is in its own try/catch so a single
+        // corrupt JSON value doesn't break the others.
+        const valueOf = (i) => (results[i].status === 'fulfilled' ? results[i].value : null);
+        const [u, m, s, p, fp, l, k] = [0, 1, 2, 3, 4, 5, 6].map(valueOf);
+
+        if (u) { try { setUserCount(parseInt(u, 10)); } catch {} }
+        if (m) { try { setCsvMeta(JSON.parse(m)); } catch {} }
+        if (s) { try { setSeenSci(new Set(JSON.parse(s))); } catch {} }
+        if (p) { try { setPoints(JSON.parse(p)); } catch {} }
+        if (fp) { try { setFirstSightingPoints(JSON.parse(fp)); } catch {} }
+        if (l) { try { setLocations(JSON.parse(l)); } catch {} }
+        if (k) setApiKey(k);
+      } catch {
+        // Anything that escaped the try blocks above. We still want to
+        // dismiss the splash and let the user see the home screen.
+      } finally {
+        if (!cancelled) {
+          clearTimeout(watchdog);
+          setHydrated(true);
+        }
+      }
     })();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(watchdog);
+    };
   }, []);
 
   // toast auto-dismiss
