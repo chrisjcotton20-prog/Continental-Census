@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Papa from 'papaparse';
-import { Upload, RefreshCw, Settings, AlertCircle, Check, X, FileText, Feather, List, Search, Square, CheckSquare, Map as MapIcon, ChevronLeft, ChevronRight, Share2, Plus, Download } from 'lucide-react';
+import { Upload, RefreshCw, Settings, AlertCircle, Check, X, FileText, Feather, List, Search, Square, CheckSquare, Map as MapIcon, ChevronLeft, ChevronRight, Share2, Plus, Download, ArrowLeftRight, Home, Lightbulb, MapPin, Calendar, Eye } from 'lucide-react';
 import { storage } from './lib/storage.js';
 import { BluebirdMascot, Cardinal, Cloud, Sparkle, Compass, TreeIcon, HeartIcon, EyeIcon, CalendarIcon, ChecklistIcon, CURRENT_MASCOT } from './Illustrations.jsx';
 import { geoAlbersUsa, geoAlbers, geoPath, geoContains, geoCentroid } from 'd3-geo';
@@ -1105,6 +1105,31 @@ const IUCN_STATUS = {
 };
 const AT_RISK_SCI = new Set(Object.keys(IUCN_STATUS));
 
+// ----------------------------------------------------------------------------
+// Per-species reference data for the detail card. These are STUBS to be filled
+// in a later data-generation pass (we deliberately don't generate all 774 up
+// front). All are keyed by binomial scientific name. When a species is absent
+// from a map, the card shows a graceful "coming soon" / unknown state.
+//
+//   SPECIES_MOVEMENT[sci] = 'migratory' | 'resident' | 'partial'
+//   SPECIES_RANGE[sci]    = [regionId, ...]   // true range, app region ids
+//   SPECIES_FACTS[sci]    = 'one-sentence quick fact'
+//
+// regionIds are the REGIONS ids: pnw, cal, ak, hi, sw, rm, gp, sp, mw, ne, se.
+// ----------------------------------------------------------------------------
+const SPECIES_MOVEMENT = {
+  // e.g. 'Setophaga cerulea': 'migratory',
+};
+const SPECIES_RANGE = {
+  // e.g. 'Setophaga cerulea': ['se','mw','ne'],
+};
+const SPECIES_FACTS = {
+  // e.g. 'Setophaga cerulea': 'One of the fastest-declining warblers in North America.',
+};
+
+const MOVEMENT_LABEL = { migratory: 'Migratory', resident: 'Resident', partial: 'Partial migrant' };
+const IUCN_LABEL = { CR: 'Critically Endangered', EN: 'Endangered', VU: 'Vulnerable', NT: 'Near Threatened' };
+
 // ---------- storage keys ----------
 const STORAGE = {
   userCount: 'ebird:userCount',
@@ -1234,6 +1259,12 @@ function parseEBirdCsv(file) {
           // We read the state from the existing "State/Province" column (which
           // we already require to be "US-XX") and look up its region.
           const speciesByRegion = new Map();
+          // Per-species personal stats for the detail card, keyed by binomial
+          // sci. We track total countable sightings, the set of locationIds the
+          // species was seen at, the earliest sighting timestamp, and the set of
+          // region ids it was seen in. Sets are converted to counts/arrays at
+          // emit time. Only native (checklist) species are tracked.
+          const perSpeciesStats = new Map(); // sci → {sightings, locIds:Set, firstTs, regions:Set}
           // Diagnostic: scientific names from countable rows that AREN'T in
           // NATIVE_SCI. Most will be legitimate non-natives (introduced
           // species, vagrant exotics) — but some may indicate AOS/Clements
@@ -1271,6 +1302,12 @@ function parseEBirdCsv(file) {
               allSpecies.add(speciesKey);
               if (baseSci && NATIVE_SCI.has(baseSci)) {
                 nativeSci.add(baseSci);
+                // per-species personal stats: count this sighting, note region
+                let ps = perSpeciesStats.get(baseSci);
+                if (!ps) { ps = { sightings: 0, locIds: new Set(), firstTs: null, regions: new Set() }; perSpeciesStats.set(baseSci, ps); }
+                ps.sightings++;
+                if (regionId) ps.regions.add(regionId);
+                if (dtValid) { const ts = dt.getTime(); if (ps.firstTs == null || ts < ps.firstTs) ps.firstTs = ts; }
                 if (regionId) {
                   let set = speciesByRegion.get(regionId);
                   if (!set) { set = new Set(); speciesByRegion.set(regionId, set); }
@@ -1305,6 +1342,8 @@ function parseEBirdCsv(file) {
                 loc.species.add(speciesKey);
                 if (baseSci && NATIVE_SCI.has(baseSci)) {
                   loc.nativeSpecies.add(baseSci);
+                  const ps = perSpeciesStats.get(baseSci);
+                  if (ps) ps.locIds.add(locId);
                 }
                 // Track the first sighting of this species. Use the binomial
                 // sci when available so subspecies reports of one species map
@@ -1386,6 +1425,17 @@ function parseEBirdCsv(file) {
               // { 'pnw': 87, 'cal': 134, ... } — native species count per region
               regionNativeCount: Object.fromEntries(
                 Array.from(speciesByRegion, ([id, set]) => [id, set.size])
+              ),
+              // Per-species personal stats for the detail card, keyed by sci:
+              // { sci: { n: sightings, loc: locationCount, first: iso|null,
+              //   regions: [regionId,...] } }. Only seen species appear here.
+              speciesStats: Object.fromEntries(
+                Array.from(perSpeciesStats, ([sci, ps]) => [sci, {
+                  n: ps.sightings,
+                  loc: ps.locIds.size,
+                  first: ps.firstTs != null ? new Date(ps.firstTs).toISOString() : null,
+                  regions: Array.from(ps.regions),
+                }])
               ),
               // Sorted by observation count desc; top 200 only to keep meta
               // small. The full list of unmatched sci names lets us see which
@@ -2537,6 +2587,7 @@ export default function BirdLifeTracker() {
       {showList && (
         <SpeciesListDrawer
           seenSci={seenSci}
+          speciesStats={csvMeta?.speciesStats || {}}
           onClose={() => { setShowList(false); }}
           {...(listFilter || {})}
         />
@@ -2793,11 +2844,184 @@ export default function BirdLifeTracker() {
 }
 
 // ============================================================================
+// Species detail card — tap a species row to see scientific/common name, IUCN
+// status, movement (migratory/resident), regions (seen-in now; true range
+// later), a quick fact (generated later), ABA rarity, and personal sighting
+// stats. Movement/range/fact read from the stubbed SPECIES_* maps and degrade
+// to "coming soon"/"unknown" until that data-generation pass is done.
+// ============================================================================
+function SpeciesDetailCard({ species, seenSci, speciesStats, onClose }) {
+  if (!species) return null;
+  const [common, sci] = species;
+  const seen = seenSci.has(sci);
+  const family = SCI_TO_FAMILY.get(sci) || 'Other';
+  const iucn = IUCN_STATUS[sci]; // undefined → Least Concern
+  const code3 = CODE_3_SCI.has(sci);
+  const movement = SPECIES_MOVEMENT[sci]; // undefined → coming soon
+  const trueRange = SPECIES_RANGE[sci];   // undefined → coming soon
+  const fact = SPECIES_FACTS[sci];        // undefined → coming soon
+  const stats = (speciesStats && speciesStats[sci]) || null;
+
+  const iucnBadgeColor =
+    iucn === 'CR' ? '#a83a3a' :
+    iucn === 'EN' ? '#ff6b6b' :
+    iucn === 'VU' ? '#c9a01a' :
+    iucn === 'NT' ? '#7a6a55' : '#8a8073'; // LC
+  const iucnText = iucn ? IUCN_LABEL[iucn] : 'Least Concern';
+  const iucnCode = iucn || 'LC';
+
+  const seenRegionNames = (stats?.regions || [])
+    .map((id) => REGION_BY_ID[id]?.name)
+    .filter(Boolean);
+
+  const firstSeenShort = stats?.first
+    ? new Date(stats.first).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+    : null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3"
+      style={{ background: 'rgba(42,52,69,0.5)', backdropFilter: 'blur(3px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full overflow-hidden flex flex-col"
+        style={{
+          maxWidth: 360, maxHeight: '90vh', background: '#fff8e8',
+          border: '3px solid #2a3445', borderRadius: 22,
+          boxShadow: '0 8px 0 0 #2a3445, 0 30px 80px rgba(0,0,0,0.35)',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* scrollable body */}
+        <div className="overflow-y-auto">
+          {/* header — sky gradient */}
+          <div style={{ background: 'linear-gradient(180deg,#6cb8e4 0%,#a8d8eb 60%,#bfe0d4 100%)', padding: '16px 16px 14px', position: 'relative' }}>
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              style={{ position: 'absolute', top: 12, right: 12, width: 30, height: 30, borderRadius: '50%', background: '#fff8e8', border: '2.5px solid #2a3445', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2a3445' }}
+            >
+              <X size={15} strokeWidth={2.5} />
+            </button>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: seen ? '#5cba87' : '#e8dcc0', border: '2px solid #2a3445', borderRadius: 999, padding: '3px 10px', marginBottom: 10 }}>
+              {seen ? <Check size={13} strokeWidth={3} style={{ color: '#10301f' }} /> : <Eye size={13} style={{ color: '#5a4a3e' }} />}
+              <span style={{ fontSize: 11, fontWeight: 600, color: seen ? '#10301f' : '#5a4a3e', letterSpacing: '0.04em' }}>
+                {seen ? 'on your life list' : 'not yet seen'}
+              </span>
+            </div>
+            <div className="font-display" style={{ fontSize: 22, fontWeight: 700, color: '#16323f', lineHeight: 1.15 }}>{common}</div>
+            <div className="font-mono" style={{ fontStyle: 'italic', fontSize: 12, color: '#2c5566', marginTop: 2 }}>{sci}</div>
+            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 11, color: '#2c5566' }}>{family}</span>
+              {code3 && (
+                <span style={{ fontSize: 10, fontWeight: 600, color: '#7a3a10', background: '#f0c89a', border: '1.5px solid #2a3445', borderRadius: 999, padding: '1px 8px', letterSpacing: '0.03em' }}>
+                  RARE · CODE 3
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* status tiles — IUCN + movement */}
+          <div style={{ display: 'flex', gap: 8, padding: '12px 14px 4px' }}>
+            <div style={{ flex: 1, background: '#ffe9b0', border: '2px solid #2a3445', borderRadius: 12, padding: '9px 8px' }}>
+              <div style={{ fontSize: 10, color: '#7a5a1e', letterSpacing: '0.03em', marginBottom: 3 }}>IUCN STATUS</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span className="font-mono" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 24, height: 18, padding: '0 5px', background: iucnBadgeColor, border: '1.5px solid #2a3445', borderRadius: 5, color: '#fff8e8', fontSize: 11, fontWeight: 600 }}>{iucnCode}</span>
+                <span style={{ fontSize: 11.5, color: '#2a3445', fontWeight: 600 }}>{iucnText}</span>
+              </div>
+            </div>
+            <div style={{ flex: 1, background: '#cdeafe', border: '2px solid #2a3445', borderRadius: 12, padding: '9px 8px' }}>
+              <div style={{ fontSize: 10, color: '#1d5a82', letterSpacing: '0.03em', marginBottom: 3 }}>MOVEMENT</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                {movement === 'resident'
+                  ? <Home size={15} style={{ color: '#185fa5' }} />
+                  : <ArrowLeftRight size={15} style={{ color: '#185fa5' }} />}
+                <span style={{ fontSize: 11.5, color: movement ? '#2a3445' : '#9a8a72', fontWeight: 600 }}>
+                  {movement ? MOVEMENT_LABEL[movement] : 'Coming soon'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* regions */}
+          <div style={{ padding: '8px 14px 4px' }}>
+            <div style={{ fontSize: 10, color: '#8a6a45', letterSpacing: '0.05em', marginBottom: 6 }}>SEEN IN YOUR REGIONS</div>
+            {seenRegionNames.length > 0 ? (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {seenRegionNames.map((name) => (
+                  <span key={name} style={{ fontSize: 11, fontWeight: 600, color: '#10301f', background: '#bfe6cf', border: '1.5px solid #2a3445', borderRadius: 999, padding: '3px 10px' }}>{name}</span>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: 11.5, color: '#9a8a72', fontStyle: 'italic' }}>
+                {seen ? 'No region recorded for your sightings.' : 'Not yet seen in any region.'}
+              </div>
+            )}
+
+            <div style={{ fontSize: 10, color: '#8a6a45', letterSpacing: '0.05em', margin: '12px 0 6px' }}>
+              FULL RANGE <span style={{ fontWeight: 600, color: '#b59a6a' }}>{trueRange ? '' : '· coming soon'}</span>
+            </div>
+            {trueRange ? (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {trueRange.map((id) => (
+                  <span key={id} style={{ fontSize: 11, fontWeight: 600, color: '#16323f', background: '#cfe8f5', border: '1.5px solid #2a3445', borderRadius: 999, padding: '3px 10px' }}>{REGION_BY_ID[id]?.name || id}</span>
+                ))}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, opacity: 0.5 }}>
+                <span style={{ fontSize: 11, color: '#5a4a3e', background: '#efe4cf', border: '1.5px dashed #b59a6a', borderRadius: 999, padding: '3px 10px' }}>range data pending</span>
+              </div>
+            )}
+          </div>
+
+          {/* quick fact */}
+          <div style={{ padding: '10px 14px 4px' }}>
+            <div style={{ background: '#fffdf6', border: '2px solid #2a3445', borderRadius: 12, padding: '10px 12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <Lightbulb size={15} style={{ color: '#d98a2b' }} />
+                <span style={{ fontSize: 10, color: '#b07a2b', letterSpacing: '0.05em', fontWeight: 600 }}>QUICK FACT</span>
+              </div>
+              <div style={{ fontSize: 12.5, lineHeight: 1.5, color: fact ? '#3a3228' : '#9a8a72', fontStyle: fact ? 'normal' : 'italic' }}>
+                {fact || 'A quick fact for this species is coming soon.'}
+              </div>
+            </div>
+          </div>
+
+          {/* personal sighting stats — only when seen */}
+          {seen && stats && (
+            <div style={{ padding: '12px 14px 16px' }}>
+              <div style={{ fontSize: 10, color: '#8a6a45', letterSpacing: '0.05em', marginBottom: 6 }}>YOUR SIGHTINGS</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ flex: 1, background: '#fde3e3', border: '2px solid #2a3445', borderRadius: 12, padding: '8px 6px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 19, fontWeight: 700, color: '#a32d2d', lineHeight: 1 }}>{stats.n}</div>
+                  <div style={{ fontSize: 9.5, color: '#7a4a4a', marginTop: 3 }}>sightings</div>
+                </div>
+                <div style={{ flex: 1, background: '#dbeefe', border: '2px solid #2a3445', borderRadius: 12, padding: '8px 6px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 19, fontWeight: 700, color: '#185fa5', lineHeight: 1 }}>{stats.loc}</div>
+                  <div style={{ fontSize: 9.5, color: '#3a6a8a', marginTop: 3 }}>locations</div>
+                </div>
+                <div style={{ flex: 1, background: '#e7f3d6', border: '2px solid #2a3445', borderRadius: 12, padding: '8px 6px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#3b6d11', lineHeight: 1.1, marginTop: 2 }}>{firstSeenShort || '—'}</div>
+                  <div style={{ fontSize: 9.5, color: '#5a7a3a', marginTop: 3 }}>first seen</div>
+                </div>
+              </div>
+            </div>
+          )}
+          {!seen && <div style={{ height: 12 }} />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
 // Species list drawer — full 774-species list with checkbox states
 // ============================================================================
-function SpeciesListDrawer({ seenSci, onClose, title, subtitle, eyebrow, restrictType, restrictValue }) {
+function SpeciesListDrawer({ seenSci, onClose, title, subtitle, eyebrow, restrictType, restrictValue, speciesStats }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all'); // 'all' | 'seen' | 'unseen'
+  const [selected, setSelected] = useState(null); // [common, sci] of tapped row
 
   // Derive the restriction predicate from primitive props so we never have to
   // store a closure-over-state function in the parent's state. This avoids a
@@ -2973,41 +3197,49 @@ function SpeciesListDrawer({ seenSci, onClose, title, subtitle, eyebrow, restric
                         return (
                           <li
                             key={sci}
-                            className="species-row flex items-center gap-3 px-3 py-2.5 border-b"
+                            className="border-b"
                             style={{ borderColor: 'rgba(42,52,69,0.08)' }}
                           >
-                            {seen ? (
-                              <CheckSquare size={22} strokeWidth={2} className="shrink-0" style={{ color: '#5cba87' }} />
-                            ) : (
-                              <Square size={22} strokeWidth={1.5} className="shrink-0" style={{ color: '#a8a294' }} />
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <div
-                                className={`text-[15px] leading-tight ${seen ? 'ink' : 'ink-soft'}`}
-                                style={seen ? { fontWeight: 600 } : undefined}
-                              >
-                                {common}
+                            <button
+                              type="button"
+                              onClick={() => setSelected([common, sci])}
+                              className="species-row w-full text-left flex items-center gap-3 px-3 py-2.5"
+                              aria-label={`View details for ${common}`}
+                            >
+                              {seen ? (
+                                <CheckSquare size={22} strokeWidth={2} className="shrink-0" style={{ color: '#5cba87' }} />
+                              ) : (
+                                <Square size={22} strokeWidth={1.5} className="shrink-0" style={{ color: '#a8a294' }} />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div
+                                  className={`text-[15px] leading-tight ${seen ? 'ink' : 'ink-soft'}`}
+                                  style={seen ? { fontWeight: 600 } : undefined}
+                                >
+                                  {common}
+                                </div>
+                                <div className="font-mono text-[10px] ink-faint mt-0.5 truncate" style={{ fontStyle: 'italic' }}>{sci}</div>
                               </div>
-                              <div className="font-mono text-[10px] ink-faint mt-0.5 truncate" style={{ fontStyle: 'italic' }}>{sci}</div>
-                            </div>
-                            {iucn && (
-                              <span
-                                className="font-mono text-[10px] shrink-0 px-1.5 py-0.5 rounded"
-                                style={{
-                                  color: badgeColor,
-                                  border: `1px solid ${badgeColor}`,
-                                  fontWeight: 600,
-                                  letterSpacing: '0.05em',
-                                }}
-                                title={
-                                  iucn === 'CR' ? 'Critically Endangered' :
-                                  iucn === 'EN' ? 'Endangered' :
-                                  iucn === 'VU' ? 'Vulnerable' : 'Near Threatened'
-                                }
-                              >
-                                {iucn}
-                              </span>
-                            )}
+                              {iucn && (
+                                <span
+                                  className="font-mono text-[10px] shrink-0 px-1.5 py-0.5 rounded"
+                                  style={{
+                                    color: badgeColor,
+                                    border: `1px solid ${badgeColor}`,
+                                    fontWeight: 600,
+                                    letterSpacing: '0.05em',
+                                  }}
+                                  title={
+                                    iucn === 'CR' ? 'Critically Endangered' :
+                                    iucn === 'EN' ? 'Endangered' :
+                                    iucn === 'VU' ? 'Vulnerable' : 'Near Threatened'
+                                  }
+                                >
+                                  {iucn}
+                                </span>
+                              )}
+                              <ChevronRight size={16} className="shrink-0 ink-faint" />
+                            </button>
                           </li>
                         );
                       })}
@@ -3028,6 +3260,15 @@ function SpeciesListDrawer({ seenSci, onClose, title, subtitle, eyebrow, restric
             Close
           </button>
         </div>
+        {/* detail card overlay */}
+        {selected && (
+          <SpeciesDetailCard
+            species={selected}
+            seenSci={seenSci}
+            speciesStats={speciesStats}
+            onClose={() => setSelected(null)}
+          />
+        )}
       </div>
     </div>
   );
