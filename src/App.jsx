@@ -2909,14 +2909,18 @@ function SpeciesListDrawer({ seenSci, onClose, title, subtitle, eyebrow, restric
           </div>
         </div>
 
-        {/* list body */}
-        <div className="relative flex-1 overflow-y-auto px-2 sm:px-4 py-2">
+        {/* list body — note: NO top padding on the scroll container. Any
+            padding-top here sits above where the sticky family header pins
+            (top:0), leaving a band that species rows visibly scroll through
+            above the pinned header. Top spacing is applied to the inner
+            content wrapper instead, which scrolls normally. */}
+        <div className="relative flex-1 overflow-y-auto px-2 sm:px-4 pb-2">
           {groups.length === 0 ? (
             <div className="text-center py-12 ink-faint text-sm">
               No matches{query ? ` for "${query}"` : ''}.
             </div>
           ) : (
-            <div className="font-body">
+            <div className="font-body pt-2">
               {groups.map(({ family, items }) => {
                 const famSeen = items.filter(([, s]) => seenSci.has(s)).length;
                 return (
