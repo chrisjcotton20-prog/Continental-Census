@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Papa from 'papaparse';
-import { Upload, RefreshCw, Settings, AlertCircle, Check, X, FileText, Feather, List, Search, Square, CheckSquare, Map as MapIcon, ChevronLeft, ChevronRight, Share2, Plus, Download, ArrowLeftRight, Home, Lightbulb, MapPin, Calendar, Eye } from 'lucide-react';
+import { Upload, RefreshCw, Settings, AlertCircle, Check, X, FileText, Feather, List, Search, Square, CheckSquare, Map as MapIcon, ChevronLeft, ChevronRight, Share2, Plus, Download, ArrowLeftRight, Home, Lightbulb, MapPin, Calendar, Eye, Anchor } from 'lucide-react';
 import { storage } from './lib/storage.js';
 import { BluebirdMascot, Cardinal, Cloud, Sparkle, Compass, TreeIcon, HeartIcon, EyeIcon, CalendarIcon, ChecklistIcon, CURRENT_MASCOT } from './Illustrations.jsx';
 import { geoAlbersUsa, geoAlbers, geoPath, geoContains, geoCentroid } from 'd3-geo';
@@ -1104,6 +1104,28 @@ const IUCN_STATUS = {
   "Brachyramphus brevirostris": "NT", "Vireo atricapilla": "NT",
 };
 const AT_RISK_SCI = new Set(Object.keys(IUCN_STATUS));
+
+// Strictly-pelagic (open-water) species: order Procellariiformes — the
+// "tubenoses" (albatrosses, fulmars, gadfly petrels, shearwaters, storm-
+// petrels). These spend their non-breeding lives on the open ocean and are
+// realistically only observable from offshore boat trips, so the card tags
+// them so the user knows they're a fundamentally different kind of target.
+// They remain fully part of the native 774 (the ABA checklist includes them);
+// this is a display tag only, not an exclusion. Keyed by GENUS so it stays
+// correct across taxonomic revisions. Jaegers/skuas, alcids, gannets,
+// tropicbirds and boobies are deliberately excluded — those are seeable from
+// shore or at breeding colonies.
+const PELAGIC_GENERA = new Set([
+  'Phoebastria',   // albatrosses
+  'Fulmarus',      // fulmars
+  'Pterodroma',    // gadfly petrels
+  'Bulweria',      // Bulwer's petrel
+  'Calonectris',   // Cory's shearwater
+  'Ardenna',       // large shearwaters
+  'Puffinus',      // small shearwaters
+  'Oceanites', 'Pelagodroma', 'Hydrobates', // storm-petrels
+]);
+const isPelagicSci = (sci) => !!sci && PELAGIC_GENERA.has(sci.split(' ')[0]);
 
 // ----------------------------------------------------------------------------
 // Per-species reference data for the detail card. These are STUBS to be filled
@@ -4416,6 +4438,7 @@ function SpeciesDetailCard({ species, seenSci, speciesStats, onClose }) {
   const family = SCI_TO_FAMILY.get(sci) || 'Other';
   const iucn = IUCN_STATUS[sci]; // undefined → Least Concern
   const code3 = CODE_3_SCI.has(sci);
+  const pelagic = isPelagicSci(sci);
   const movement = SPECIES_MOVEMENT[sci]; // undefined → coming soon
   const trueRange = SPECIES_RANGE[sci];   // undefined → coming soon
   const fact = SPECIES_FACTS[sci];        // undefined → coming soon
@@ -4471,11 +4494,16 @@ function SpeciesDetailCard({ species, seenSci, speciesStats, onClose }) {
             </div>
             <div className="font-display" style={{ fontSize: 22, fontWeight: 700, color: '#16323f', lineHeight: 1.15 }}>{common}</div>
             <div className="font-mono" style={{ fontStyle: 'italic', fontSize: 12, color: '#2c5566', marginTop: 2 }}>{sci}</div>
-            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 11, color: '#2c5566' }}>{family}</span>
               {code3 && (
                 <span style={{ fontSize: 10, fontWeight: 600, color: '#7a3a10', background: '#f0c89a', border: '1.5px solid #2a3445', borderRadius: 999, padding: '1px 8px', letterSpacing: '0.03em' }}>
                   RARE · CODE 3
+                </span>
+              )}
+              {pelagic && (
+                <span style={{ fontSize: 10, fontWeight: 600, color: '#0d3b54', background: '#bfe0ef', border: '1.5px solid #2a3445', borderRadius: 999, padding: '1px 8px', letterSpacing: '0.03em', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <Anchor size={10} strokeWidth={2.5} /> PELAGIC
                 </span>
               )}
             </div>
