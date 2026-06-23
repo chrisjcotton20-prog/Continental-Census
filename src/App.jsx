@@ -2066,6 +2066,621 @@ const SPECIES_RANGE = {
   'Sphyrapicus varius': ['ak', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Yellow-bellied Sapsucker
   'Setophaga coronata': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Yellow-rumped Warbler
   'Setophaga dominica': ['sp', 'mw', 'se'],  // Yellow-throated Warbler
+  // ---- remaining checklist species (regular occurrence, vagrants excluded) ----
+  'Empidonax virescens': ['gp', 'sp', 'mw', 'ne', 'se'],  // Acadian Flycatcher
+  'Loxops caeruleirostris': ['hi'],  // Akekee
+  'Hemignathus wilsoni': ['hi'],  // Akiapolaau
+  'Oreomystis bairdi': ['hi'],  // Akikiki
+  'Palmeria dolei': ['hi'],  // Akohekohe
+  'Empidonax alnorum': ['pnw', 'ak', 'rm', 'gp', 'mw', 'ne'],  // Alder Flycatcher
+  'Onychoprion aleuticus': ['ak'],  // Aleutian Tern
+  'Icterus gularis': ['sp'],  // Altamira Oriole
+  'Recurvirostra americana': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'se'],  // American Avocet
+  'Botaurus lentiginosus': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // American Bittern
+  'Anas rubripes': ['gp', 'mw', 'ne', 'se'],  // American Black Duck
+  'Phoenicopterus ruber': ['se'],  // American Flamingo
+  'Pluvialis dominica': ['ak', 'gp', 'sp', 'mw', 'ne', 'se'],  // American Golden-Plover
+  'Astur atricapillus': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'mw', 'ne'],  // American Goshawk
+  'Haematopus palliatus': ['cal', 'sp', 'ne', 'se'],  // American Oystercatcher
+  'Anthus rubescens': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // American Pipit
+  'Setophaga ruticilla': ['pnw', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // American Redstart
+  'Picoides dorsalis': ['pnw', 'ak', 'rm', 'mw', 'ne'],  // American Three-toed Woodpecker
+  'Spizelloides arborea': ['ak', 'pnw', 'rm', 'gp', 'mw', 'ne', 'se'],  // American Tree Sparrow
+  'Pelecanus erythrorhynchos': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'mw', 'se'],  // American White Pelican
+  'Scolopax minor': ['gp', 'sp', 'mw', 'ne', 'se'],  // American Woodcock
+  'Synthliboramphus antiquus': ['pnw', 'cal', 'ak'],  // Ancient Murrelet
+  'Magumma parva': ['hi'],  // Anianiau
+  'Chordeiles gundlachii': ['se'],  // Antillean Nighthawk
+  'Himatione sanguinea': ['hi'],  // Apapane
+  'Falco femoralis': ['sw'],  // Aplomado Falcon
+  'Gavia arctica': ['ak'],  // Arctic Loon
+  'Sterna paradisaea': ['pnw', 'ak', 'ne'],  // Arctic Tern
+  'Phylloscopus borealis': ['ak'],  // Arctic Warbler
+  'Dryobates arizonae': ['sw'],  // Arizona Woodpecker
+  'Hydrobates homochroa': ['cal'],  // Ashy Storm-Petrel
+  'Fratercula arctica': ['ne'],  // Atlantic Puffin
+  'Icterus graduacauda': ['sp'],  // Audubon's Oriole
+  'Puffinus lherminieri': ['se'],  // Audubon's Shearwater
+  'Peucaea aestivalis': ['sp', 'se'],  // Bachman's Sparrow
+  'Calidris bairdii': ['ak', 'cal', 'rm', 'gp', 'sp', 'mw', 'ne'],  // Baird's Sandpiper
+  'Centronyx bairdii': ['rm', 'gp'],  // Baird's Sparrow
+  'Icterus galbula': ['rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Baltimore Oriole
+  'Hydrobates castro': ['hi', 'se'],  // Band-rumped Storm-Petrel
+  'Patagioenas fasciata': ['pnw', 'cal', 'sw', 'rm'],  // Band-tailed Pigeon
+  'Riparia riparia': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne'],  // Bank Swallow
+  'Limosa lapponica': ['ak'],  // Bar-tailed Godwit
+  'Tyto alba': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Barn Owl
+  'Hirundo rustica': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Barn Swallow
+  'Bucephala islandica': ['pnw', 'cal', 'ak', 'rm', 'ne'],  // Barrow's Goldeneye
+  'Setophaga castanea': ['ak', 'rm', 'gp', 'mw', 'ne', 'se'],  // Bay-breasted Warbler
+  'Artemisiospiza belli': ['cal'],  // Bell's Sparrow
+  'Vireo bellii': ['cal', 'sw', 'rm', 'gp', 'sp', 'mw'],  // Bell's Vireo
+  'Toxostoma bendirei': ['cal', 'sw'],  // Bendire's Thrasher
+  'Pterodroma cahow': ['se'],  // Bermuda Petrel
+  'Saucerottia beryllina': ['sw'],  // Berylline Hummingbird
+  'Catharus bicknelli': ['ne'],  // Bicknell's Thrush
+  'Cepphus grylle': ['ak', 'ne'],  // Black Guillemot
+  'Anous minutus': ['hi'],  // Black Noddy
+  'Haematopus bachmani': ['pnw', 'cal', 'ak'],  // Black Oystercatcher
+  'Laterallus jamaicensis': ['cal', 'sp', 'ne', 'se'],  // Black Rail
+  'Leucosticte atrata': ['rm'],  // Black Rosy-Finch
+  'Melanitta americana': ['pnw', 'cal', 'ak', 'ne', 'se'],  // Black Scoter
+  'Hydrobates melania': ['cal'],  // Black Storm-Petrel
+  'Cypseloides niger': ['pnw', 'cal', 'sw', 'rm'],  // Black Swift
+  'Chlidonias niger': ['pnw', 'cal', 'sw', 'rm', 'gp', 'mw', 'ne', 'se'],  // Black Tern
+  'Picoides arcticus': ['pnw', 'cal', 'ak', 'rm', 'mw', 'ne'],  // Black-backed Woodpecker
+  'Dendrocygna autumnalis': ['cal', 'sw', 'sp', 'se'],  // Black-bellied Whistling-Duck
+  'Coccyzus erythropthalmus': ['rm', 'gp', 'mw', 'ne', 'se'],  // Black-billed Cuckoo
+  'Pica hudsonia': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp'],  // Black-billed Magpie
+  'Polioptila nigriceps': ['sw'],  // Black-capped Gnatcatcher
+  'Pterodroma hasitata': ['se'],  // Black-capped Petrel
+  'Vireo atricapilla': ['sw', 'sp'],  // Black-capped Vireo
+  'Archilochus alexandri': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp'],  // Black-chinned Hummingbird
+  'Spizella atrogularis': ['cal', 'sw'],  // Black-chinned Sparrow
+  'Baeolophus atricristatus': ['sp'],  // Black-crested Titmouse
+  'Phoebastria nigripes': ['pnw', 'cal', 'ak', 'hi'],  // Black-footed Albatross
+  'Pheucticus melanocephalus': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp'],  // Black-headed Grosbeak
+  'Chroicocephalus ridibundus': ['ak', 'ne'],  // Black-headed Gull
+  'Rissa tridactyla': ['pnw', 'cal', 'ak', 'ne'],  // Black-legged Kittiwake
+  'Himantopus mexicanus': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'se'],  // Black-necked Stilt
+  'Polioptila melanura': ['cal', 'sw', 'sp'],  // Black-tailed Gnatcatcher
+  'Limosa limosa': ['ak'],  // Black-tailed Godwit
+  'Setophaga nigrescens': ['pnw', 'cal', 'sw', 'rm'],  // Black-throated Gray Warbler
+  'Setophaga virens': ['rm', 'gp', 'mw', 'ne', 'se'],  // Black-throated Green Warbler
+  'Puffinus opisthomelas': ['cal'],  // Black-vented Shearwater
+  'Vireo altiloquus': ['se'],  // Black-whiskered Vireo
+  'Pterodroma nigripennis': ['cal'],  // Black-winged Petrel
+  'Setophaga fusca': ['rm', 'gp', 'mw', 'ne', 'se'],  // Blackburnian Warbler
+  'Setophaga striata': ['ak', 'pnw', 'rm', 'mw', 'ne', 'se'],  // Blackpoll Warbler
+  'Passerina caerulea': ['cal', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Blue Grosbeak
+  'Anous ceruleus': ['hi'],  // Blue-gray Noddy
+  'Vireo solitarius': ['rm', 'gp', 'mw', 'ne', 'se'],  // Blue-headed Vireo
+  'Lampornis clemenciae': ['sw'],  // Blue-throated Mountain-gem
+  'Spatula discors': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Blue-winged Teal
+  'Vermivora cyanoptera': ['gp', 'sp', 'mw', 'ne', 'se'],  // Blue-winged Warbler
+  'Cyanecula svecica': ['ak'],  // Bluethroat
+  'Dolichonyx oryzivorus': ['pnw', 'rm', 'gp', 'mw', 'ne'],  // Bobolink
+  'Bombycilla garrulus': ['ak', 'pnw', 'rm', 'gp', 'mw', 'ne'],  // Bohemian Waxwing
+  'Chroicocephalus philadelphia': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Bonaparte's Gull
+  'Pterodroma hypoleuca': ['hi'],  // Bonin Petrel
+  'Poecile hudsonicus': ['ak', 'pnw', 'rm', 'mw', 'ne'],  // Boreal Chickadee
+  'Aegolius funereus': ['ak', 'rm', 'mw'],  // Boreal Owl
+  'Peucaea botterii': ['sw', 'sp'],  // Botteri's Sparrow
+  'Fringilla montifringilla': ['ak'],  // Brambling
+  'Urile penicillatus': ['pnw', 'cal', 'ak'],  // Brandt's Cormorant
+  'Branta bernicla': ['pnw', 'cal', 'ak', 'ne', 'se'],  // Brant
+  'Spizella breweri': ['pnw', 'cal', 'sw', 'rm', 'gp'],  // Brewer's Sparrow
+  'Onychoprion anaethetus': ['se'],  // Bridled Tern
+  'Baeolophus wollweberi': ['sw'],  // Bridled Titmouse
+  'Numenius tahitiensis': ['ak', 'hi'],  // Bristle-thighed Curlew
+  'Cynanthus latirostris': ['sw'],  // Broad-billed Hummingbird
+  'Selasphorus platycercus': ['sw', 'rm', 'gp'],  // Broad-tailed Hummingbird
+  'Buteo platypterus': ['rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Broad-winged Hawk
+  'Molothrus aeneus': ['sw', 'sp', 'se'],  // Bronzed Cowbird
+  'Sula leucogaster': ['hi', 'se'],  // Brown Booby
+  'Anous stolidus': ['hi', 'se'],  // Brown Noddy
+  'Leucosticte australis': ['rm'],  // Brown-capped Rosy-Finch
+  'Myiarchus tyrannulus': ['cal', 'sw', 'sp'],  // Brown-crested Flycatcher
+  'Amazilia yucatanensis': ['sp'],  // Buff-bellied Hummingbird
+  'Empidonax fulvifrons': ['sw'],  // Buff-breasted Flycatcher
+  'Calidris subruficollis': ['ak', 'gp', 'sp', 'mw'],  // Buff-breasted Sandpiper
+  'Antrostomus ridgwayi': ['sw'],  // Buff-collared Nightjar
+  'Ardenna bulleri': ['pnw', 'cal'],  // Buller's Shearwater
+  'Icterus bullockii': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp'],  // Bullock's Oriole
+  'Bulweria bulwerii': ['hi'],  // Bulwer's Petrel
+  'Athene cunicularia': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'se'],  // Burrowing Owl
+  'Branta hutchinsii': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Cackling Goose
+  'Gymnogyps californianus': ['cal', 'sw'],  // California Condor
+  'Polioptila californica': ['cal'],  // California Gnatcatcher
+  'Callipepla californica': ['pnw', 'cal', 'sw'],  // California Quail
+  'Toxostoma redivivum': ['cal'],  // California Thrasher
+  'Selasphorus calliope': ['pnw', 'cal', 'sw', 'rm'],  // Calliope Hummingbird
+  'Perisoreus canadensis': ['pnw', 'cal', 'ak', 'rm', 'mw', 'ne'],  // Canada Jay
+  'Aythya valisineria': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Canvasback
+  'Melozone fusca': ['cal', 'sw', 'rm', 'gp'],  // Canyon Towhee
+  'Hydroprogne caspia': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Caspian Tern
+  'Loxia sinesciuris': ['rm'],  // Cassia Crossbill
+  'Ptychoramphus aleuticus': ['pnw', 'cal', 'ak'],  // Cassin's Auklet
+  'Haemorhous cassinii': ['pnw', 'cal', 'sw', 'rm', 'gp'],  // Cassin's Finch
+  'Peucaea cassinii': ['sw', 'gp', 'sp'],  // Cassin's Sparrow
+  'Vireo cassinii': ['pnw', 'cal', 'sw', 'rm'],  // Cassin's Vireo
+  'Bubulcus ibis': ['cal', 'sw', 'sp', 'mw', 'ne', 'se'],  // Cattle Egret
+  'Petrochelidon fulva': ['sw', 'sp', 'se'],  // Cave Swallow
+  'Setophaga cerulea': ['gp', 'sp', 'mw', 'ne', 'se'],  // Cerulean Warbler
+  'Calcarius ornatus': ['rm', 'gp', 'sp'],  // Chestnut-collared Longspur
+  'Corvus cryptoleucus': ['sw', 'rm', 'gp', 'sp'],  // Chihuahuan Raven
+  'Puffinus nativitatis': ['hi'],  // Christmas Shearwater
+  'Antrostomus carolinensis': ['sp', 'mw', 'ne', 'se'],  // Chuck-will's-widow
+  'Spatula cyanoptera': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp'],  // Cinnamon Teal
+  'Rallus crepitans': ['ne', 'se'],  // Clapper Rail
+  'Aechmophorus clarkii': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp'],  // Clark's Grebe
+  'Spizella pallida': ['ak', 'rm', 'gp', 'mw'],  // Clay-colored Sparrow
+  'Turdus grayi': ['sp'],  // Clay-colored Thrush
+  'Leiothlypis crissalis': ['sw'],  // Colima Warbler
+  'Buteogallus anthracinus': ['sw'],  // Common Black Hawk
+  'Cuculus canorus': ['ak'],  // Common Cuckoo
+  'Somateria mollissima': ['ak', 'ne'],  // Common Eider
+  'Tringa nebularia': ['ak'],  // Common Greenshank
+  'Columbina passerina': ['cal', 'sw', 'sp', 'se'],  // Common Ground Dove
+  'Gavia immer': ['pnw', 'cal', 'ak', 'rm', 'gp', 'mw', 'ne', 'se'],  // Common Loon
+  'Mergus merganser': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'mw', 'ne', 'se'],  // Common Merganser
+  'Uria aalge': ['pnw', 'cal', 'ak', 'ne'],  // Common Murre
+  'Chordeiles minor': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Common Nighthawk
+  'Nyctidromus albicollis': ['sp'],  // Common Pauraque
+  'Aythya ferina': ['ak'],  // Common Pochard
+  'Phalaenoptilus nuttallii': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp'],  // Common Poorwill
+  'Acanthis flammea': ['ak', 'pnw', 'rm', 'gp', 'mw', 'ne'],  // Common Redpoll
+  'Charadrius hiaticula': ['ak'],  // Common Ringed Plover
+  'Actitis hypoleucos': ['ak'],  // Common Sandpiper
+  'Gallinago gallinago': ['ak'],  // Common Snipe
+  'Sterna hirundo': ['pnw', 'cal', 'gp', 'mw', 'ne', 'se'],  // Common Tern
+  'Oporornis agilis': ['rm', 'gp', 'mw', 'ne'],  // Connecticut Warbler
+  'Pterodroma cookii': ['cal'],  // Cook's Petrel
+  'Empidonax occidentalis': ['sw', 'rm'],  // Cordilleran Flycatcher
+  'Calonectris diomedea': ['ne', 'se'],  // Cory's Shearwater
+  'Tyrannus couchii': ['sp'],  // Couch's Kingbird
+  'Synthliboramphus craveri': ['cal'],  // Craveri's Murrelet
+  'Aethia cristatella': ['ak'],  // Crested Auklet
+  'Caracara cheriway': ['cal', 'sw', 'sp', 'se'],  // Crested Caracara
+  'Toxostoma crissale': ['cal', 'sw'],  // Crissal Thrasher
+  'Calidris ferruginea': ['ak'],  // Curlew Sandpiper
+  'Toxostoma curvirostre': ['sw', 'sp'],  // Curve-billed Thrasher
+  'Spiza americana': ['rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Dickcissel
+  'Alle alle': ['ne'],  // Dovekie
+  'Calidris alpina': ['pnw', 'cal', 'ak', 'gp', 'sp', 'mw', 'ne', 'se'],  // Dunlin
+  'Empidonax oberholseri': ['pnw', 'cal', 'sw', 'rm'],  // Dusky Flycatcher
+  'Dendragapus obscurus': ['pnw', 'sw', 'rm'],  // Dusky Grouse
+  'Myiarchus tuberculifer': ['sw'],  // Dusky-capped Flycatcher
+  'Podiceps nigricollis': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Eared Grebe
+  'Megascops asio': ['rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Eastern Screech-Owl
+  'Antrostomus vociferus': ['rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Eastern Whip-poor-will
+  'Contopus virens': ['gp', 'sp', 'mw', 'ne', 'se'],  // Eastern Wood-Pewee
+  'Motacilla tschutschensis': ['ak'],  // Eastern Yellow Wagtail
+  'Trogon elegans': ['sw'],  // Elegant Trogon
+  'Micrathene whitneyi': ['sw'],  // Elf Owl
+  'Anser canagicus': ['ak'],  // Emperor Goose
+  'Mareca penelope': ['pnw', 'cal', 'ak', 'ne'],  // Eurasian Wigeon
+  'Coccothraustes vespertinus': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'mw', 'ne'],  // Evening Grosbeak
+  'Turdus obscurus': ['ak'],  // Eyebrowed Thrush
+  'Pterodroma feae': ['ne'],  // Fea's Petrel
+  'Buteo regalis': ['cal', 'sw', 'rm', 'gp', 'sp'],  // Ferruginous Hawk
+  'Glaucidium brasilianum': ['sw', 'sp'],  // Ferruginous Pygmy-Owl
+  'Spizella pusilla': ['gp', 'sp', 'mw', 'ne', 'se'],  // Field Sparrow
+  'Amphispiza quinquestriata': ['sw'],  // Five-striped Sparrow
+  'Piranga bidentata': ['sw'],  // Flame-colored Tanager
+  'Psiloscops flammeolus': ['pnw', 'cal', 'sw', 'rm'],  // Flammulated Owl
+  'Ardenna carneipes': ['pnw', 'cal'],  // Flesh-footed Shearwater
+  'Aphelocoma coerulescens': ['se'],  // Florida Scrub-Jay
+  'Tyrannus savana': ['se'],  // Fork-tailed Flycatcher
+  'Hydrobates furcatus': ['pnw', 'cal', 'ak'],  // Fork-tailed Storm-Petrel
+  'Passerella iliaca': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Fox Sparrow
+  'Leucophaeus pipixcan': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'mw'],  // Franklin's Gull
+  'Dendrocygna bicolor': ['cal', 'sp', 'se'],  // Fulvous Whistling-Duck
+  'Mareca strepera': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Gadwall
+  'Callipepla gambelii': ['cal', 'sw', 'sp'],  // Gambel's Quail
+  'Melanerpes uropygialis': ['sw'],  // Gila Woodpecker
+  'Colaptes chrysoides': ['sw'],  // Gilded Flicker
+  'Larus hyperboreus': ['pnw', 'cal', 'ak', 'gp', 'mw', 'ne', 'se'],  // Glaucous Gull
+  'Larus glaucescens': ['pnw', 'cal', 'ak'],  // Glaucous-winged Gull
+  'Aquila chrysaetos': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne'],  // Golden Eagle
+  'Setophaga chrysoparia': ['sp'],  // Golden-cheeked Warbler
+  'Zonotrichia atricapilla': ['pnw', 'cal', 'ak', 'sw', 'rm'],  // Golden-crowned Sparrow
+  'Melanerpes aurifrons': ['sw', 'sp'],  // Golden-fronted Woodpecker
+  'Vermivora chrysoptera': ['gp', 'mw', 'ne', 'se'],  // Golden-winged Warbler
+  'Setophaga graciae': ['sw', 'rm'],  // Grace's Warbler
+  'Ammodramus savannarum': ['cal', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Grasshopper Sparrow
+  'Empidonax wrightii': ['cal', 'sw', 'rm', 'gp'],  // Gray Flycatcher
+  'Buteo plagiatus': ['sw', 'sp'],  // Gray Hawk
+  'Tyrannus dominicensis': ['se'],  // Gray Kingbird
+  'Vireo vicinior': ['cal', 'sw', 'rm'],  // Gray Vireo
+  'Onychoprion lunatus': ['hi'],  // Gray-backed Tern
+  'Catharus minimus': ['ak', 'ne'],  // Gray-cheeked Thrush
+  'Leucosticte tephrocotis': ['pnw', 'cal', 'ak', 'rm'],  // Gray-crowned Rosy-Finch
+  'Poecile cinctus': ['ak'],  // Gray-headed Chickadee
+  'Tringa brevipes': ['ak'],  // Gray-tailed Tattler
+  'Larus marinus': ['gp', 'mw', 'ne', 'se'],  // Great Black-backed Gull
+  'Phalacrocorax carbo': ['ne'],  // Great Cormorant
+  'Fregata minor': ['hi'],  // Great Frigatebird
+  'Strix nebulosa': ['pnw', 'ak', 'rm', 'mw'],  // Great Gray Owl
+  'Bubo virginianus': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Great Horned Owl
+  'Pitangus sulphuratus': ['sp'],  // Great Kiskadee
+  'Ardenna gravis': ['ne', 'se'],  // Great Shearwater
+  'Stercorarius skua': ['ne'],  // Great Skua
+  'Contopus pertinax': ['sw'],  // Greater Pewee
+  'Tympanuchus cupido': ['gp', 'mw'],  // Greater Prairie-Chicken
+  'Geococcyx californianus': ['cal', 'sw', 'rm', 'gp', 'sp'],  // Greater Roadrunner
+  'Centrocercus urophasianus': ['pnw', 'cal', 'sw', 'rm', 'gp'],  // Greater Sage-Grouse
+  'Aythya marila': ['pnw', 'cal', 'ak', 'gp', 'mw', 'ne', 'se'],  // Greater Scaup
+  'Anser albifrons': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Greater White-fronted Goose
+  'Tringa melanoleuca': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Greater Yellowlegs
+  'Butorides virescens': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Green Heron
+  'Cyanocorax yncas': ['sp'],  // Green Jay
+  'Chloroceryle americana': ['sw', 'sp'],  // Green Kingfisher
+  'Pipilo chlorurus': ['pnw', 'cal', 'sw', 'rm', 'gp'],  // Green-tailed Towhee
+  'Anas crecca': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Green-winged Teal
+  'Crotophaga sulcirostris': ['sw', 'sp'],  // Groove-billed Ani
+  'Synthliboramphus hypoleucus': ['cal'],  // Guadalupe Murrelet
+  'Gelochelidon nilotica': ['cal', 'sp', 'ne', 'se'],  // Gull-billed Tern
+  'Centrocercus minimus': ['rm'],  // Gunnison Sage-Grouse
+  'Falco rusticolus': ['ak', 'pnw', 'rm', 'mw', 'ne'],  // Gyrfalcon
+  'Empidonax hammondii': ['pnw', 'cal', 'ak', 'sw', 'rm'],  // Hammond's Flycatcher
+  'Histrionicus histrionicus': ['pnw', 'cal', 'ak', 'rm', 'ne'],  // Harlequin Duck
+  'Parabuteo unicinctus': ['cal', 'sw', 'sp'],  // Harris's Hawk
+  'Zonotrichia querula': ['gp', 'sp', 'mw'],  // Harris's Sparrow
+  'Loxops coccineus': ['hi'],  // Hawaii Akepa
+  'Chlorodrepanis virens': ['hi'],  // Hawaii Amakihi
+  'Loxops mana': ['hi'],  // Hawaii Creeper
+  'Chasiempis sandwichensis': ['hi'],  // Hawaii Elepaio
+  'Fulica alai': ['hi'],  // Hawaiian Coot
+  'Anas wyvilliana': ['hi'],  // Hawaiian Duck
+  'Branta sandvicensis': ['hi'],  // Hawaiian Goose
+  'Buteo solitarius': ['hi'],  // Hawaiian Hawk
+  'Pterodroma sandwichensis': ['hi'],  // Hawaiian Petrel
+  'Centronyx henslowii': ['gp', 'mw', 'ne', 'se'],  // Henslow's Sparrow
+  'Piranga flava': ['sw'],  // Hepatic Tanager
+  'Setophaga occidentalis': ['pnw', 'cal'],  // Hermit Warbler
+  'Larus argentatus': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Herring Gull
+  'Acanthis hornemanni': ['ak'],  // Hoary Redpoll
+  'Icterus cucullatus': ['cal', 'sw', 'sp'],  // Hooded Oriole
+  'Chondrohierax uncinatus': ['sp'],  // Hook-billed Kite
+  'Podiceps auritus': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Horned Grebe
+  'Eremophila alpestris': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Horned Lark
+  'Fratercula corniculata': ['pnw', 'ak'],  // Horned Puffin
+  'Troglodytes aedon': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // House Wren
+  'Limosa haemastica': ['ak', 'gp', 'mw', 'ne', 'se'],  // Hudsonian Godwit
+  'Vireo huttoni': ['pnw', 'cal', 'sw'],  // Hutton's Vireo
+  'Larus glaucoides': ['ak', 'mw', 'ne'],  // Iceland Gull
+  'Drepanis coccinea': ['hi'],  // Iiwi
+  'Columbina inca': ['cal', 'sw', 'rm', 'gp', 'sp', 'se'],  // Inca Dove
+  'Aphelocoma insularis': ['cal'],  // Island Scrub-Jay
+  'Pagophila eburnea': ['ak'],  // Ivory Gull
+  'Pterodroma externa': ['cal'],  // Juan Fernandez Petrel
+  'Baeolophus ridgwayi': ['cal', 'sw', 'rm'],  // Juniper Titmouse
+  'Chlorodrepanis stejnegeri': ['hi'],  // Kauai Amakihi
+  'Chasiempis sclateri': ['hi'],  // Kauai Elepaio
+  'Geothlypis formosa': ['gp', 'sp', 'mw', 'ne', 'se'],  // Kentucky Warbler
+  'Somateria spectabilis': ['ak', 'ne'],  // King Eider
+  'Rallus elegans': ['sp', 'mw', 'ne', 'se'],  // King Rail
+  'Setophaga kirtlandii': ['mw', 'se'],  // Kirtland's Warbler
+  'Brachyramphus brevirostris': ['ak'],  // Kittlitz's Murrelet
+  'Myiarchus sagrae': ['se'],  // La Sagra's Flycatcher
+  'Calcarius lapponicus': ['ak', 'pnw', 'cal', 'rm', 'gp', 'sp', 'mw', 'ne'],  // Lapland Longspur
+  'Calamospiza melanocorys': ['sw', 'rm', 'gp', 'sp'],  // Lark Bunting
+  'Chondestes grammacus': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'mw'],  // Lark Sparrow
+  'Spinus lawrencei': ['cal', 'sw'],  // Lawrence's Goldfinch
+  'Phoebastria immutabilis': ['cal', 'hi', 'ak'],  // Laysan Albatross
+  'Anas laysanensis': ['hi'],  // Laysan Duck
+  'Telespiza cantans': ['hi'],  // Laysan Finch
+  'Passerina amoena': ['pnw', 'cal', 'sw', 'rm', 'gp'],  // Lazuli Bunting
+  'Ammospiza leconteii': ['gp', 'sp', 'mw', 'ne', 'se'],  // LeConte's Sparrow
+  'Toxostoma lecontei': ['cal', 'sw'],  // LeConte's Thrasher
+  'Hydrobates leucorhous': ['pnw', 'cal', 'ak', 'ne'],  // Leach's Storm-Petrel
+  'Aethia pusilla': ['ak'],  // Least Auklet
+  'Ixobrychus exilis': ['cal', 'sp', 'mw', 'ne', 'se'],  // Least Bittern
+  'Tachybaptus dominicus': ['sw', 'sp', 'se'],  // Least Grebe
+  'Hydrobates microsoma': ['cal'],  // Least Storm-Petrel
+  'Sternula antillarum': ['cal', 'sw', 'gp', 'sp', 'mw', 'ne', 'se'],  // Least Tern
+  'Larus fuscus': ['gp', 'mw', 'ne', 'se'],  // Lesser Black-backed Gull
+  'Chordeiles acutipennis': ['cal', 'sw', 'sp'],  // Lesser Nighthawk
+  'Tympanuchus pallidicinctus': ['sw', 'gp', 'sp'],  // Lesser Prairie-Chicken
+  'Anarhynchus mongolus': ['ak'],  // Lesser Sand-Plover
+  'Aythya affinis': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Lesser Scaup
+  'Tringa flavipes': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Lesser Yellowlegs
+  'Melanerpes lewis': ['pnw', 'cal', 'sw', 'rm'],  // Lewis's Woodpecker
+  'Aramus guarauna': ['se'],  // Limpkin
+  'Melospiza lincolnii': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Lincoln's Sparrow
+  'Hydrocoloeus minutus': ['mw', 'ne'],  // Little Gull
+  'Lanius ludovicianus': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Loggerhead Shrike
+  'Limnodromus scolopaceus': ['pnw', 'cal', 'ak', 'sw', 'gp', 'sp', 'mw', 'ne', 'se'],  // Long-billed Dowitcher
+  'Brachyramphus perdix': ['pnw', 'cal', 'ak'],  // Long-billed Murrelet
+  'Toxostoma longirostre': ['sp'],  // Long-billed Thrasher
+  'Asio otus': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne'],  // Long-eared Owl
+  'Clangula hyemalis': ['pnw', 'cal', 'ak', 'rm', 'gp', 'mw', 'ne', 'se'],  // Long-tailed Duck
+  'Stercorarius longicaudus': ['pnw', 'cal', 'ak'],  // Long-tailed Jaeger
+  'Calidris subminuta': ['ak'],  // Long-toed Stint
+  'Parkesia motacilla': ['sw', 'gp', 'sp', 'mw', 'ne', 'se'],  // Louisiana Waterthrush
+  'Calothorax lucifer': ['sw'],  // Lucifer Hummingbird
+  'Leiothlypis luciae': ['sw'],  // Lucy's Warbler
+  'Geothlypis tolmiei': ['pnw', 'cal', 'ak', 'sw', 'rm'],  // MacGillivray's Warbler
+  'Fregata magnificens': ['cal', 'sp', 'se'],  // Magnificent Frigatebird
+  'Setophaga magnolia': ['ak', 'rm', 'gp', 'mw', 'ne', 'se'],  // Magnolia Warbler
+  'Coccyzus minor': ['se'],  // Mangrove Cuckoo
+  'Puffinus puffinus': ['ne', 'se'],  // Manx Shearwater
+  'Brachyramphus marmoratus': ['pnw', 'cal', 'ak'],  // Marbled Murrelet
+  'Aerodramus bartschi': ['hi'],  // Mariana Swiftlet
+  'Cistothorus palustris': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Marsh Wren
+  'Sula dactylatra': ['hi', 'se'],  // Masked Booby
+  'Nomonyx dominicus': ['sp', 'se'],  // Masked Duck
+  'Paroreomyza montana': ['hi'],  // Maui Alauahio
+  'Pseudonestor xanthophrys': ['hi'],  // Maui Parrotbill
+  'Plectrophenax hyperboreus': ['ak'],  // McKay's Bunting
+  'Falco columbarius': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Merlin
+  'Poecile sclateri': ['sw'],  // Mexican Chickadee
+  'Anas diazi': ['sw', 'sp'],  // Mexican Duck
+  'Aphelocoma wollweberi': ['sw'],  // Mexican Jay
+  'Colibri thalassinus': ['sw', 'sp'],  // Mexican Violetear
+  'Antrostomus arizonae': ['sw'],  // Mexican Whip-poor-will
+  'Acrocephalus familiaris': ['hi'],  // Millerbird
+  'Ictinia mississippiensis': ['sw', 'gp', 'sp', 'mw', 'se'],  // Mississippi Kite
+  'Cyrtonyx montezumae': ['sw', 'sp'],  // Montezuma Quail
+  'Sporophila morelleti': ['sp'],  // Morelet's Seedeater
+  'Anas fulvigula': ['sp', 'se'],  // Mottled Duck
+  'Pterodroma inexpectata': ['pnw', 'cal', 'ak'],  // Mottled Petrel
+  'Sialia currucoides': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp'],  // Mountain Bluebird
+  'Poecile gambeli': ['pnw', 'cal', 'sw', 'rm'],  // Mountain Chickadee
+  'Anarhynchus montanus': ['cal', 'sw', 'rm', 'gp', 'sp'],  // Mountain Plover
+  'Oreortyx pictus': ['pnw', 'cal', 'sw'],  // Mountain Quail
+  'Geothlypis philadelphia': ['rm', 'gp', 'mw', 'ne'],  // Mourning Warbler
+  'Pterodroma ultima': ['cal'],  // Murphy's Petrel
+  'Cairina moschata': ['sp'],  // Muscovy Duck
+  'Leiothlypis ruficapilla': ['pnw', 'cal', 'rm', 'gp', 'mw', 'ne', 'se'],  // Nashville Warbler
+  'Ammospiza nelsoni': ['ak', 'gp', 'mw', 'ne', 'se'],  // Nelson's Sparrow
+  'Nannopterum brasilianum': ['cal', 'sw', 'sp', 'se'],  // Neotropic Cormorant
+  'Puffinus newelli': ['hi'],  // Newell's Shearwater
+  'Telespiza ultima': ['hi'],  // Nihoa Finch
+  'Camptostoma imberbe': ['sw', 'sp'],  // Northern Beardless-Tyrannulet
+  'Colinus virginianus': ['sw', 'gp', 'sp', 'mw', 'ne', 'se'],  // Northern Bobwhite
+  'Fulmarus glacialis': ['pnw', 'cal', 'ak', 'ne'],  // Northern Fulmar
+  'Morus bassanus': ['ne', 'se'],  // Northern Gannet
+  'Circus hudsonius': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Northern Harrier
+  'Surnia ulula': ['ak', 'pnw', 'rm', 'mw', 'ne'],  // Northern Hawk Owl
+  'Anas acuta': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Northern Pintail
+  'Glaucidium gnoma': ['pnw', 'cal', 'sw', 'rm'],  // Northern Pygmy-Owl
+  'Stelgidopteryx serripennis': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Northern Rough-winged Swallow
+  'Aegolius acadicus': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'mw', 'ne', 'se'],  // Northern Saw-whet Owl
+  'Spatula clypeata': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Northern Shoveler
+  'Lanius borealis': ['ak', 'pnw', 'rm', 'gp', 'mw', 'ne'],  // Northern Shrike
+  'Parkesia noveboracensis': ['pnw', 'ak', 'rm', 'gp', 'mw', 'ne', 'se'],  // Northern Waterthrush
+  'Oenanthe oenanthe': ['ak'],  // Northern Wheatear
+  'Chlorodrepanis flava': ['hi'],  // Oahu Amakihi
+  'Chasiempis ibidis': ['hi'],  // Oahu Elepaio
+  'Arremonops rufivirgatus': ['sp'],  // Olive Sparrow
+  'Peucedramus taeniatus': ['sw'],  // Olive Warbler
+  'Anthus hodgsoni': ['ak'],  // Olive-backed Pipit
+  'Contopus cooperi': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'mw', 'ne'],  // Olive-sided Flycatcher
+  'Myadestes obscurus': ['hi'],  // Omao
+  'Leiothlypis celata': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Orange-crowned Warbler
+  'Icterus spurius': ['sw', 'gp', 'sp', 'mw', 'ne', 'se'],  // Orchard Oriole
+  'Seiurus aurocapilla': ['rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Ovenbird
+  'Pluvialis fulva': ['ak', 'cal', 'hi'],  // Pacific Golden-Plover
+  'Gavia pacifica': ['pnw', 'cal', 'ak'],  // Pacific Loon
+  'Empidonax difficilis': ['pnw', 'cal', 'ak', 'sw'],  // Pacific-slope Flycatcher
+  'Myioborus pictus': ['sw'],  // Painted Redstart
+  'Loxioides bailleui': ['hi'],  // Palila
+  'Aethia psittacula': ['ak'],  // Parakeet Auklet
+  'Stercorarius parasiticus': ['pnw', 'cal', 'ak', 'ne', 'se'],  // Parasitic Jaeger
+  'Calidris melanotos': ['pnw', 'cal', 'ak', 'gp', 'sp', 'mw', 'ne', 'se'],  // Pectoral Sandpiper
+  'Phainopepla nitens': ['cal', 'sw', 'sp'],  // Phainopepla
+  'Vireo philadelphicus': ['rm', 'gp', 'mw', 'ne'],  // Philadelphia Vireo
+  'Cepphus columba': ['pnw', 'cal', 'ak'],  // Pigeon Guillemot
+  'Pinicola enucleator': ['ak', 'pnw', 'cal', 'rm', 'mw', 'ne'],  // Pine Grosbeak
+  'Spinus pinus': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Pine Siskin
+  'Ardenna creatopus': ['pnw', 'cal'],  // Pink-footed Shearwater
+  'Gymnorhinus cyanocephalus': ['cal', 'sw', 'rm', 'gp'],  // Pinyon Jay
+  'Ortalis vetula': ['sp'],  // Plain Chachalaca
+  'Vireo plumbeus': ['sw', 'rm', 'gp'],  // Plumbeous Vireo
+  'Stercorarius pomarinus': ['pnw', 'cal', 'ak', 'ne', 'se'],  // Pomarine Jaeger
+  'Falco mexicanus': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp'],  // Prairie Falcon
+  'Setophaga discolor': ['gp', 'sp', 'mw', 'ne', 'se'],  // Prairie Warbler
+  'Myadestes palmeri': ['hi'],  // Puaiohi
+  'Porphyrio martinicus': ['sp', 'se'],  // Purple Gallinule
+  'Progne subis': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Purple Martin
+  'Calidris maritima': ['ne', 'se'],  // Purple Sandpiper
+  'Sitta pygmaea': ['pnw', 'cal', 'sw', 'rm'],  // Pygmy Nuthatch
+  'Cardinalis sinuatus': ['cal', 'sw', 'sp'],  // Pyrrhuloxia
+  'Alca torda': ['ne'],  // Razorbill
+  'Loxia curvirostra': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'mw', 'ne', 'se'],  // Red Crossbill
+  'Calidris canutus': ['pnw', 'cal', 'ak', 'gp', 'ne', 'se'],  // Red Knot
+  'Phalaropus fulicarius': ['pnw', 'cal', 'ak'],  // Red Phalarope
+  'Patagioenas flavirostris': ['sp'],  // Red-billed Pigeon
+  'Phaethon aethereus': ['cal', 'hi'],  // Red-billed Tropicbird
+  'Sitta canadensis': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'mw', 'ne', 'se'],  // Red-breasted Nuthatch
+  'Sphyrapicus ruber': ['pnw', 'cal'],  // Red-breasted Sapsucker
+  'Dryobates borealis': ['sp', 'se'],  // Red-cockaded Woodpecker
+  'Vireo olivaceus': ['pnw', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Red-eyed Vireo
+  'Urile urile': ['ak'],  // Red-faced Cormorant
+  'Cardellina rubrifrons': ['sw'],  // Red-faced Warbler
+  'Sula sula': ['hi'],  // Red-footed Booby
+  'Rissa brevirostris': ['ak'],  // Red-legged Kittiwake
+  'Sphyrapicus nuchalis': ['pnw', 'cal', 'sw', 'rm', 'gp'],  // Red-naped Sapsucker
+  'Podiceps grisegena': ['pnw', 'cal', 'ak', 'gp', 'mw', 'ne', 'se'],  // Red-necked Grebe
+  'Phalaropus lobatus': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp'],  // Red-necked Phalarope
+  'Calidris ruficollis': ['ak'],  // Red-necked Stint
+  'Phaethon rubricauda': ['hi'],  // Red-tailed Tropicbird
+  'Gavia stellata': ['pnw', 'cal', 'ak', 'ne', 'se'],  // Red-throated Loon
+  'Anthus cervinus': ['ak'],  // Red-throated Pipit
+  'Egretta rufescens': ['cal', 'sp', 'se'],  // Reddish Egret
+  'Aythya americana': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Redhead
+  'Cerorhinca monocerata': ['pnw', 'cal', 'ak'],  // Rhinoceros Auklet
+  'Rallus obsoletus': ['cal', 'sw'],  // Ridgway's Rail
+  'Aythya collaris': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Ring-necked Duck
+  'Megaceryle torquata': ['sp'],  // Ringed Kingfisher
+  'Eugenes fulgens': ['sw'],  // Rivoli's Hummingbird
+  'Lagopus muta': ['ak'],  // Rock Ptarmigan
+  'Calidris ptilocnemis': ['pnw', 'ak'],  // Rock Sandpiper
+  'Salpinctes obsoletus': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp'],  // Rock Wren
+  'Pheucticus ludovicianus': ['rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Rose-breasted Grosbeak
+  'Pachyramphus aglaiae': ['sw', 'sp'],  // Rose-throated Becard
+  'Platalea ajaja': ['sp', 'se'],  // Roseate Spoonbill
+  'Sterna dougallii': ['ne', 'se'],  // Roseate Tern
+  'Anser rossii': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Ross's Goose
+  'Rhodostethia rosea': ['ak'],  // Ross's Gull
+  'Buteo lagopus': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Rough-legged Hawk
+  'Thalasseus maximus': ['cal', 'sp', 'ne', 'se'],  // Royal Tern
+  'Archilochus colubris': ['gp', 'sp', 'mw', 'ne', 'se'],  // Ruby-throated Hummingbird
+  'Columbina talpacoti': ['sw', 'sp'],  // Ruddy Ground Dove
+  'Calidris pugnax': ['ak'],  // Ruff
+  'Bonasa umbellus': ['pnw', 'cal', 'ak', 'rm', 'gp', 'mw', 'ne', 'se'],  // Ruffed Grouse
+  'Turdus rufopalliatus': ['sw'],  // Rufous-backed Robin
+  'Basileuterus rufifrons': ['sw'],  // Rufous-capped Warbler
+  'Aimophila ruficeps': ['cal', 'sw', 'rm', 'sp'],  // Rufous-crowned Sparrow
+  'Peucaea carpalis': ['sw'],  // Rufous-winged Sparrow
+  'Emberiza rustica': ['ak'],  // Rustic Bunting
+  'Euphagus carolinus': ['ak', 'rm', 'gp', 'mw', 'ne', 'se'],  // Rusty Blackbird
+  'Xema sabini': ['pnw', 'cal', 'ak'],  // Sabine's Gull
+  'Oreoscoptes montanus': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp'],  // Sage Thrasher
+  'Artemisiospiza nevadensis': ['cal', 'sw', 'rm', 'gp'],  // Sagebrush Sparrow
+  'Ammospiza caudacuta': ['ne', 'se'],  // Saltmarsh Sparrow
+  'Antigone canadensis': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'se'],  // Sandhill Crane
+  'Thalasseus sandvicensis': ['sp', 'ne', 'se'],  // Sandwich Tern
+  'Passerculus sandwichensis': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Savannah Sparrow
+  'Callipepla squamata': ['sw', 'rm', 'gp', 'sp'],  // Scaled Quail
+  'Piranga olivacea': ['gp', 'sp', 'mw', 'ne', 'se'],  // Scarlet Tanager
+  'Tyrannus forficatus': ['sw', 'gp', 'sp', 'mw'],  // Scissor-tailed Flycatcher
+  'Icterus parisorum': ['cal', 'sw', 'sp'],  // Scott's Oriole
+  'Synthliboramphus scrippsi': ['cal'],  // Scripps's Murrelet
+  'Ammospiza maritima': ['ne', 'se'],  // Seaside Sparrow
+  'Cistothorus platensis': ['gp', 'sp', 'mw', 'ne', 'se'],  // Sedge Wren
+  'Accipiter striatus': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Sharp-shinned Hawk
+  'Tympanuchus phasianellus': ['pnw', 'ak', 'rm', 'gp', 'mw'],  // Sharp-tailed Grouse
+  'Calidris acuminata': ['ak', 'cal'],  // Sharp-tailed Sandpiper
+  'Molothrus bonariensis': ['se'],  // Shiny Cowbird
+  'Larus brachyrhynchus': ['pnw', 'cal', 'ak'],  // Short-billed Gull
+  'Asio flammeus': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Short-eared Owl
+  'Phoebastria albatrus': ['ak'],  // Short-tailed Albatross
+  'Buteo brachyurus': ['se'],  // Short-tailed Hawk
+  'Ardenna tenuirostris': ['pnw', 'cal', 'ak'],  // Short-tailed Shearwater
+  'Calliope calliope': ['ak'],  // Siberian Rubythroat
+  'Larus schistisagus': ['ak'],  // Slaty-backed Gull
+  'Mergellus albellus': ['ak'],  // Smew
+  'Calcarius pictus': ['ak', 'gp', 'mw'],  // Smith's Longspur
+  'Crotophaga ani': ['se'],  // Smooth-billed Ani
+  'Rostrhamus sociabilis': ['se'],  // Snail Kite
+  'Plectrophenax nivalis': ['ak', 'pnw', 'rm', 'gp', 'mw', 'ne'],  // Snow Bunting
+  'Anser caerulescens': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Snow Goose
+  'Bubo scandiacus': ['ak', 'pnw', 'rm', 'gp', 'mw', 'ne'],  // Snowy Owl
+  'Tringa solitaria': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Solitary Sandpiper
+  'Dendragapus fuliginosus': ['pnw', 'cal', 'ak'],  // Sooty Grouse
+  'Ardenna grisea': ['pnw', 'cal', 'ak', 'ne', 'se'],  // Sooty Shearwater
+  'Onychoprion fuscatus': ['hi', 'sp', 'se'],  // Sooty Tern
+  'Porzana carolina': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Sora
+  'Stercorarius maccormicki': ['pnw', 'cal', 'ne'],  // South Polar Skua
+  'Somateria fischeri': ['ak'],  // Spectacled Eider
+  'Strix occidentalis': ['pnw', 'cal', 'sw'],  // Spotted Owl
+  'Actitis macularius': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Spotted Sandpiper
+  'Pipilo maculatus': ['pnw', 'cal', 'sw', 'rm', 'gp'],  // Spotted Towhee
+  'Anthus spragueii': ['gp', 'sp'],  // Sprague's Pipit
+  'Falcipennis canadensis': ['pnw', 'ak', 'rm', 'mw', 'ne'],  // Spruce Grouse
+  'Polysticta stelleri': ['ak'],  // Steller's Eider
+  'Calidris himantopus': ['ak', 'gp', 'sp', 'mw', 'ne', 'se'],  // Stilt Sandpiper
+  'Myiodynastes luteiventris': ['sw'],  // Sulphur-bellied Flycatcher
+  'Melanitta perspicillata': ['pnw', 'cal', 'ak', 'gp', 'mw', 'ne', 'se'],  // Surf Scoter
+  'Calidris virgata': ['pnw', 'cal', 'ak'],  // Surfbird
+  'Buteo swainsoni': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'mw'],  // Swainson's Hawk
+  'Catharus ustulatus': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'mw', 'ne'],  // Swainson's Thrush
+  'Limnothlypis swainsonii': ['sp', 'se'],  // Swainson's Warbler
+  'Anser fabalis': ['ak'],  // Taiga Bean-Goose
+  'Calidris temminckii': ['ak'],  // Temminck's Stint
+  'Leiothlypis peregrina': ['ak', 'rm', 'gp', 'mw', 'ne', 'se'],  // Tennessee Warbler
+  'Xenus cinereus': ['ak'],  // Terek Sandpiper
+  'Tyrannus crassirostris': ['sw'],  // Thick-billed Kingbird
+  'Rhynchophanes mccownii': ['rm', 'gp', 'sp'],  // Thick-billed Longspur
+  'Uria lomvia': ['ak', 'ne'],  // Thick-billed Murre
+  'Myadestes townsendi': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp'],  // Townsend's Solitaire
+  'Hydrobates socorroensis': ['cal'],  // Townsend's Storm-Petrel
+  'Setophaga townsendi': ['pnw', 'cal', 'ak', 'rm'],  // Townsend's Warbler
+  'Tachycineta bicolor': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Tree Swallow
+  'Agelaius tricolor': ['cal'],  // Tricolored Blackbird
+  'Pterodroma arminjoniana': ['se'],  // Trindade Petrel
+  'Hydrobates tristrami': ['hi'],  // Tristram's Storm-Petrel
+  'Tyrannus melancholicus': ['sw', 'sp'],  // Tropical Kingbird
+  'Setophaga pitiayumi': ['sp'],  // Tropical Parula
+  'Cygnus buccinator': ['pnw', 'ak', 'rm', 'gp', 'mw'],  // Trumpeter Swan
+  'Aythya fuligula': ['pnw', 'cal', 'ak', 'ne'],  // Tufted Duck
+  'Fratercula cirrhata': ['pnw', 'cal', 'ak'],  // Tufted Puffin
+  'Anser serrirostris': ['ak'],  // Tundra Bean-Goose
+  'Cygnus columbianus': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'mw', 'ne', 'se'],  // Tundra Swan
+  'Bartramia longicauda': ['pnw', 'ak', 'rm', 'gp', 'mw', 'ne'],  // Upland Sandpiper
+  'Passerina versicolor': ['sw', 'sp'],  // Varied Bunting
+  'Chaetura vauxi': ['pnw', 'cal', 'ak'],  // Vaux's Swift
+  'Catharus fuscescens': ['pnw', 'rm', 'gp', 'mw', 'ne', 'se'],  // Veery
+  'Pooecetes gramineus': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Vesper Sparrow
+  'Leucolia violiceps': ['sw'],  // Violet-crowned Hummingbird
+  'Tachycineta thalassina': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp'],  // Violet-green Swallow
+  'Rallus limicola': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Virginia Rail
+  'Leiothlypis virginiae': ['sw', 'rm'],  // Virginia's Warbler
+  'Tringa incana': ['pnw', 'cal', 'ak', 'hi'],  // Wandering Tattler
+  'Vireo gilvus': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Warbling Vireo
+  'Ardenna pacifica': ['hi'],  // Wedge-tailed Shearwater
+  'Sialia mexicana': ['pnw', 'cal', 'sw', 'rm'],  // Western Bluebird
+  'Aechmophorus occidentalis': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp'],  // Western Grebe
+  'Tyrannus verticalis': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'mw'],  // Western Kingbird
+  'Sturnella neglecta': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'mw'],  // Western Meadowlark
+  'Calidris mauri': ['pnw', 'cal', 'ak', 'sw', 'gp', 'sp', 'mw', 'ne', 'se'],  // Western Sandpiper
+  'Megascops kennicottii': ['pnw', 'cal', 'sw', 'rm'],  // Western Screech-Owl
+  'Spindalis zena': ['se'],  // Western Spindalis
+  'Piranga ludoviciana': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp'],  // Western Tanager
+  'Contopus sordidulus': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp'],  // Western Wood-Pewee
+  'Numenius phaeopus': ['pnw', 'cal', 'ak', 'gp', 'sp', 'ne', 'se'],  // Whimbrel
+  'Aethia pygmaea': ['ak'],  // Whiskered Auklet
+  'Megascops trichopsis': ['sw'],  // Whiskered Screech-Owl
+  'Gygis alba': ['hi'],  // White Tern
+  'Motacilla alba': ['ak'],  // White Wagtail
+  'Patagioenas leucocephala': ['se'],  // White-crowned Pigeon
+  'Zonotrichia leucophrys': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // White-crowned Sparrow
+  'Basilinna leucotis': ['sw'],  // White-eared Hummingbird
+  'Plegadis chihi': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp'],  // White-faced Ibis
+  'Pelagodroma marina': ['cal'],  // White-faced Storm-Petrel
+  'Dryobates albolarvatus': ['pnw', 'cal'],  // White-headed Woodpecker
+  'Pterodroma cervicalis': ['hi'],  // White-necked Petrel
+  'Calidris fuscicollis': ['ak', 'gp', 'sp', 'mw', 'ne', 'se'],  // White-rumped Sandpiper
+  'Geranoaetus albicaudatus': ['sp'],  // White-tailed Hawk
+  'Elanus leucurus': ['pnw', 'cal', 'sw', 'sp', 'se'],  // White-tailed Kite
+  'Lagopus leucura': ['pnw', 'ak', 'rm'],  // White-tailed Ptarmigan
+  'Phaethon lepturus': ['hi', 'se'],  // White-tailed Tropicbird
+  'Leptotila verreauxi': ['sp'],  // White-tipped Dove
+  'Loxia leucoptera': ['ak', 'pnw', 'rm', 'mw', 'ne'],  // White-winged Crossbill
+  'Zenaida asiatica': ['cal', 'sw', 'sp', 'se'],  // White-winged Dove
+  'Melanitta deglandi': ['pnw', 'cal', 'ak', 'gp', 'mw', 'ne', 'se'],  // White-winged Scoter
+  'Cygnus cygnus': ['ak'],  // Whooper Swan
+  'Grus americana': ['sp', 'gp'],  // Whooping Crane
+  'Sphyrapicus thyroideus': ['pnw', 'cal', 'sw', 'rm'],  // Williamson's Sapsucker
+  'Empidonax traillii': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Willow Flycatcher
+  'Lagopus lagopus': ['ak'],  // Willow Ptarmigan
+  'Phalaropus tricolor': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'mw'],  // Wilson's Phalarope
+  'Gallinago delicata': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Wilson's Snipe
+  'Oceanites oceanicus': ['ne', 'se'],  // Wilson's Storm-Petrel
+  'Cardellina pusilla': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'mw', 'ne', 'se'],  // Wilson's Warbler
+  'Troglodytes hiemalis': ['rm', 'gp', 'mw', 'ne', 'se'],  // Winter Wren
+  'Aix sponsa': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Wood Duck
+  'Tringa glareola': ['ak'],  // Wood Sandpiper
+  'Mycteria americana': ['sp', 'se'],  // Wood Stork
+  'Aphelocoma woodhouseii': ['cal', 'sw', 'rm', 'gp'],  // Woodhouse's Scrub-Jay
+  'Helmitheros vermivorum': ['gp', 'sp', 'mw', 'ne', 'se'],  // Worm-eating Warbler
+  'Coturnicops noveboracensis': ['gp', 'mw', 'ne', 'se'],  // Yellow Rail
+  'Setophaga petechia': ['pnw', 'cal', 'ak', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Yellow Warbler
+  'Empidonax flaviventris': ['ak', 'rm', 'gp', 'mw', 'ne'],  // Yellow-bellied Flycatcher
+  'Coccyzus americanus': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Yellow-billed Cuckoo
+  'Gavia adamsii': ['ak'],  // Yellow-billed Loon
+  'Pica nuttalli': ['cal'],  // Yellow-billed Magpie
+  'Icteria virens': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'],  // Yellow-breasted Chat
+  'Nyctanassa violacea': ['sw', 'sp', 'mw', 'ne', 'se'],  // Yellow-crowned Night-Heron
+  'Junco phaeonotus': ['sw'],  // Yellow-eyed Junco
+  'Larus livens': ['cal', 'sw'],  // Yellow-footed Gull
+  'Vireo flavoviridis': ['sp'],  // Yellow-green Vireo
+  'Xanthocephalus xanthocephalus': ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'mw'],  // Yellow-headed Blackbird
+  'Vireo flavifrons': ['gp', 'sp', 'mw', 'ne', 'se'],  // Yellow-throated Vireo
+  'Buteo albonotatus': ['sw', 'sp'],  // Zone-tailed Hawk
 };
 const SPECIES_FACTS = {
   // e.g. 'Setophaga cerulea': 'One of the fastest-declining warblers in North America.',
