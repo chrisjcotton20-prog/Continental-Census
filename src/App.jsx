@@ -7,6 +7,7 @@ import { geoAlbersUsa, geoAlbers, geoPath, geoContains, geoCentroid } from 'd3-g
 import { contourDensity, contours as d3contours } from 'd3-contour';
 import { feature, mesh, merge } from 'topojson-client';
 import statesTopo from 'us-atlas/states-10m.json';
+import NATIONAL_PARKS from './data_national_parks.json';
 
 // ============================================================================
 // THE TOTAL — derived from the ABA Checklist v8.0.7 (Jan 2021, 1,120 species)
@@ -5698,6 +5699,25 @@ const REGION_BORDERS = mesh(statesTopo, statesTopo.objects.states, (a, b) => {
   return STATE_TO_REGION[FIPS_TO_ABBR[a.id]] !== STATE_TO_REGION[FIPS_TO_ABBR[b.id]];
 });
 
+// Assign each National Park to a region by testing its centroid against the
+// region polygons. Parks whose centroid lands in no region (e.g. American
+// Samoa, far offshore) are dropped — they'd never appear in a regional view.
+// Computed once at module load. Result: { regionId: [parkFeature, …] }.
+const PARKS_BY_REGION = (() => {
+  const out = {};
+  for (const r of REGIONS) out[r.id] = [];
+  for (const park of NATIONAL_PARKS.features) {
+    let c;
+    try { c = geoCentroid(park); } catch { continue; }
+    if (!c || !Number.isFinite(c[0]) || !Number.isFinite(c[1])) continue;
+    for (const r of REGIONS) {
+      const geo = REGION_GEOMETRY[r.id];
+      if (geo && geoContains(geo, c)) { out[r.id].push(park); break; }
+    }
+  }
+  return out;
+})();
+
 // Albers USA projection sized for a 700×440 viewBox
 const MAP_W = 700;
 const MAP_H = 440;
@@ -6689,6 +6709,29 @@ function SightingsMapView({
                   })}
                 </g>
 
+                {/* National Park outlines — only when zoomed into a region.
+                    A faint dark-green stroke + very light green fill, drawn
+                    BELOW the heat contours so the heatmap always reads on top
+                    and the parks sit as subtle context. Parks are pre-grouped
+                    by region (PARKS_BY_REGION) so we only draw the handful in
+                    the active region. */}
+                {region && PARKS_BY_REGION[region] && PARKS_BY_REGION[region].length > 0 && (
+                  <g>
+                    {PARKS_BY_REGION[region].map((park, i) => (
+                      <path
+                        key={`park-${i}`}
+                        d={activePath(park) || ''}
+                        fill="rgba(46,107,79,0.10)"
+                        stroke="rgba(46,107,79,0.45)"
+                        strokeWidth={0.75}
+                        strokeLinejoin="round"
+                      >
+                        <title>{park.properties.name} National Park</title>
+                      </path>
+                    ))}
+                  </g>
+                )}
+
                 {/* Heatmap contours, masked to a *dilated* outline so coastal
                     and barrier-island hotspots remain visible. */}
                 <g mask="url(#us-mask)">
@@ -6760,15 +6803,33 @@ function SightingsMapView({
                   user still see the region's geography so the zoom is
                   obviously working. */}
               {projectedCount === 0 && (
-                <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 text-center ink-faint text-xs sm:text-sm pointer-events-none">
+                <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 text-center text-xs sm:text-sm pointer-events-none">
                   {mode === 'first' && !firstAvailable ? (
-                    <span className="inline-block bg-[#0c1f1f]/80 px-3 py-2 rounded-lg" style={{ pointerEvents: 'auto' }}>
+                    <span
+                      className="inline-block px-3 py-2 rounded-xl"
+                      style={{
+                        pointerEvents: 'auto',
+                        background: '#fff8e8',
+                        color: '#2a3445',
+                        border: '2px solid #2a3445',
+                        boxShadow: '0 2px 0 0 #2a3445',
+                      }}
+                    >
                       First-sightings data isn't in storage yet — re-upload your
                       <span className="font-mono"> MyEBirdData.csv </span>
                       from Settings to enable this view.
                     </span>
                   ) : (
-                    <span className="inline-block bg-[#0c1f1f]/80 px-3 py-1.5 rounded-lg">
+                    <span
+                      className="inline-block px-3 py-1.5 rounded-xl"
+                      style={{
+                        background: '#fff8e8',
+                        color: '#2a3445',
+                        border: '2px solid #2a3445',
+                        boxShadow: '0 2px 0 0 #2a3445',
+                        fontWeight: 600,
+                      }}
+                    >
                       no sightings {region ? 'in this region' : 'mapped yet'}
                     </span>
                   )}
