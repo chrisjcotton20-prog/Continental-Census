@@ -4,7 +4,7 @@ import { Upload, RefreshCw, Settings, AlertCircle, Check, X, FileText, Feather, 
 import { storage } from './lib/storage.js';
 import { BluebirdMascot, Cardinal, Cloud, Sparkle, Compass, TreeIcon, HeartIcon, EyeIcon, CalendarIcon, ChecklistIcon, CURRENT_MASCOT } from './Illustrations.jsx';
 import { geoAlbersUsa, geoAlbers, geoPath, geoContains, geoCentroid } from 'd3-geo';
-import { contourDensity } from 'd3-contour';
+import { contourDensity, contours as d3contours } from 'd3-contour';
 import { feature, mesh, merge } from 'topojson-client';
 import statesTopo from 'us-atlas/states-10m.json';
 
@@ -803,6 +803,11 @@ const NATIVE_SPECIES = [
 
 const TOTAL = NATIVE_SPECIES.length;
 const NATIVE_SCI = new Set(NATIVE_SPECIES.map(([, s]) => s));
+// Map each checklist scientific name to its index in NATIVE_SPECIES. Used to
+// encode per-location species sets compactly as integer arrays in the heatmap
+// point data, so the distinct-species density can de-duplicate species that
+// occur at multiple nearby locations.
+const SCI_TO_INDEX = new Map(NATIVE_SPECIES.map(([, s], i) => [s, i]));
 
 // eBird scientific-name ALIASES.
 // eBird/Clements periodically shuffles species between genera, and different
@@ -3012,13 +3017,25 @@ function parseEBirdCsv(file) {
           }
 
           // Outputs:
-          //   points              — [[lng, lat, speciesCount], ...] heatmap, ALL species seen
+          //   points              — [[lng, lat, speciesCount, [sciIdx,...]], ...]
+          //                         heatmap data. [2] is the distinct-species
+          //                         COUNT at the location (kept for the "peak N
+          //                         at one spot" stat and back-compat); [3] is
+          //                         the list of native-species indices present
+          //                         there, used by the distinct-species density
+          //                         to de-duplicate species shared across nearby
+          //                         locations.
           //   firstSightingPoints — [[lng, lat, newSpeciesCount], ...] heatmap, FIRST sightings only
           //   locations           — [{id, name, lng, lat, species, nativeSpecies}, ...] for tips
           const points = [];
           const locationsArr = [];
           for (const loc of locations.values()) {
-            points.push([loc.lng, loc.lat, loc.species.size]);
+            const sciIdx = [];
+            for (const s of loc.nativeSpecies) {
+              const idx = SCI_TO_INDEX.get(s);
+              if (idx !== undefined) sciIdx.push(idx);
+            }
+            points.push([loc.lng, loc.lat, loc.species.size, sciIdx]);
             // Only locations with a real eBird Location ID can be queried via the API.
             // Coordinate-key locations are kept out of the tips dataset.
             if (loc.id && loc.id.startsWith('L')) {
@@ -5716,15 +5733,98 @@ const REGION_PROJ_FN = {
 // `t` in [0, 1]. The lowest stop is fully transparent so the outer fringe of
 // each hotspot fades naturally into the map background instead of stopping at
 // a hard 60%-alpha edge.
-// Number of overlapping weight-1 (single-species) sites at which the
-// colormap saturates to the hot end. Bigger value → harder to reach the
-// hot end (more cluster build-up needed). Smaller → easier to reach.
+// Number of DISTINCT species in an area at which the colormap saturates to the
+// hot (red) end. Since the density now measures true distinct-species counts
+// (not summed/compressed location weights), this value is directly
+// interpretable: at 50, an area with ~50 distinct species nearby reads as
+// saturated red, and the blue→green→yellow→orange ramp spreads across 0–50.
+// Tune up if hotspots feel too saturated; down if the hot end is too hard to
+// reach. (Was 12 under the old sqrt-compressed KDE scale.)
+const HEATMAP_SATURATION_N = 50;
+
+// ----------------------------------------------------------------------------
+// Distinct-species density grid.
 //
-// 6 picks a sweet spot: a small cluster of ~3 single-species sites lands
-// in the warm range, ~6 hits saturation, and beyond that everything
-// clamps. Tune up if your hotspots feel too saturated; tune down if the
-// hot end is too hard to reach.
-const HEATMAP_SATURATION_N = 12;
+// PROBLEM with the old approach: it ran a kernel density estimate weighting
+// each location by its species COUNT, then let d3 SUM overlapping kernels. KDE
+// has no notion of species identity, so the same species observed at several
+// nearby locations was counted once per location. Two adjacent spots with
+// {Cardinal, Blue Jay, Wren} and {Cardinal, Wren, Chickadee} summed to 6 even
+// though only 4 distinct species are present — inflating dense metros ~2x.
+//
+// FIX: compute density per SPECIES, taking the MAX of that species' kernel
+// across the locations where it occurs (a union, not a sum — a species present
+// at 5 nearby spots is still just "present"), then SUM those per-species fields
+// across species. The result at any pixel ≈ the number of DISTINCT species
+// present in the surrounding area. Set-union can't be expressed as a weighted
+// KDE, so we build the density grid by hand and hand it to d3.contours().
+//
+// `pts` is the projected, region-filtered point list: [x, y, count, [sciIdx…]].
+// Returns { grid: Float64Array(gw*gh), gw, gh } in row-major order.
+function distinctSpeciesGrid(pts, viewBoxW, viewBoxH, bandwidth, cellSize) {
+  const gw = Math.ceil(viewBoxW / cellSize);
+  const gh = Math.ceil(viewBoxH / cellSize);
+  const grid = new Float64Array(gw * gh);
+  // Gaussian kernel falls below ~1e-3 past 3.7σ; clamp the per-location stamp
+  // radius there so each location only touches nearby cells (keeps it fast).
+  const sigma = bandwidth / cellSize;            // σ in grid cells
+  const inv2s2 = 1 / (2 * sigma * sigma);
+  const reach = Math.ceil(sigma * 3.7);
+
+  // Invert: build species → list of locations (grid coords). A point's [3] is
+  // its species-index array; if absent (legacy data) fall back to a single
+  // synthetic "species" per location so the function still produces a sane grid.
+  const speciesLocs = new Map(); // sciIdx → [[gx,gy], …]
+  let synthetic = 0;
+  for (const p of pts) {
+    const gx = p[0] / cellSize, gy = p[1] / cellSize;
+    const idxs = (p.length >= 4 && Array.isArray(p[3])) ? p[3] : null;
+    if (idxs && idxs.length) {
+      for (const id of idxs) {
+        let arr = speciesLocs.get(id);
+        if (!arr) { arr = []; speciesLocs.set(id, arr); }
+        arr.push([gx, gy]);
+      }
+    } else {
+      // legacy fallback: treat the location's count as that many anonymous
+      // species all sitting at this one spot (no cross-location dedup possible)
+      const n = (p.length >= 3 && Number.isFinite(p[2])) ? p[2] : 1;
+      for (let k = 0; k < n; k++) speciesLocs.set('syn' + (synthetic++), [[gx, gy]]);
+    }
+  }
+
+  // For each species, stamp the MAX of its location kernels into a scratch
+  // field, then add that field into the accumulator grid.
+  const scratch = new Float64Array(gw * gh);
+  for (const locs of speciesLocs.values()) {
+    // collect the bounding set of touched cells for this species, max-combining
+    // its locations, then add once to grid.
+    const touched = new Map(); // cellIndex → maxKernelValue
+    for (const [cx, cy] of locs) {
+      const x0 = Math.max(0, Math.floor(cx - reach));
+      const x1 = Math.min(gw - 1, Math.ceil(cx + reach));
+      const y0 = Math.max(0, Math.floor(cy - reach));
+      const y1 = Math.min(gh - 1, Math.ceil(cy + reach));
+      for (let yy = y0; yy <= y1; yy++) {
+        const dy = yy - cy;
+        for (let xx = x0; xx <= x1; xx++) {
+          const dx = xx - cx;
+          const v = Math.exp(-(dx * dx + dy * dy) * inv2s2);
+          const ci = yy * gw + xx;
+          const prev = touched.get(ci);
+          if (prev === undefined || v > prev) touched.set(ci, v);
+        }
+      }
+    }
+    for (const [ci, v] of touched) grid[ci] += v;
+  }
+  return { grid, gw, gh };
+}
+
+// Peak density a single isolated species (one location) produces under the
+// same kernel — the stable scale anchor. With the Gaussian kernel peaking at
+// 1.0, this is exactly 1.0, but we compute it the same way for safety.
+function singleSpeciesPeak() { return 1.0; }
 
 // Floor anchor: the smallest visible blob always renders at this point on
 // the colormap. 0.20 lands solidly inside the visible blue band of
@@ -5955,10 +6055,9 @@ function SightingsMapView({
     };
   }, [region]);
 
-  // Project points to pixel space. Each point is [lng, lat, weight] where
-  // weight is unique species count at that location. When zoomed to a region,
-  // points are first filtered to those inside the region's geometry so the
-  // density contours represent only that region's data.
+  // Project points to pixel space. Each point is [lng, lat, count, [sciIdx…]].
+  // When zoomed to a region, points are first filtered to those inside the
+  // region's geometry so the density reflects only that region's data.
   const { contours, projectedCount, maxValue, singlePointRef, totalSpeciesAcrossLocations, totalLocations } = useMemo(() => {
     const projected = [];
     let totalW = 0;
@@ -5967,11 +6066,12 @@ function SightingsMapView({
       const lng = p[0], lat = p[1];
       const w = (p.length >= 3 && Number.isFinite(p[2])) ? p[2] : 1;
       // Region filter: skip points outside the active region's geometry.
-      // geoContains operates in lng/lat space against the polygon.
       if (regionGeo && !geoContains(regionGeo, [lng, lat])) continue;
       const xy = activeProj([lng, lat]);
       if (xy && !isNaN(xy[0]) && !isNaN(xy[1])) {
-        projected.push([xy[0], xy[1], w]);
+        // carry the species-index list (p[3]) through so the density can
+        // de-duplicate species shared across nearby locations.
+        projected.push([xy[0], xy[1], w, (p.length >= 4 && Array.isArray(p[3])) ? p[3] : null]);
         totalW += w;
       }
     }
@@ -5979,69 +6079,43 @@ function SightingsMapView({
       return { contours: [], projectedCount: 0, maxValue: 0, singlePointRef: 0, totalSpeciesAcrossLocations: 0, totalLocations: 0 };
     }
 
-    // Step 1: calibrate the per-point reference density.
-    // Run the same kernel estimator on a single synthetic weight-1 point
-    // at the center of the viewBox to find the peak density that one
-    // isolated single-species point produces. This becomes our stable
-    // unit of measure — adding more clusters elsewhere doesn't change
-    // this value, so it makes a solid foundation for the colormap.
-    //
-    // We use a high threshold count here so the last contour level lands
-    // close to the actual peak density, not a coarse approximation.
-    // Bandwidth (kernel blob size) is set per zoom level: the national US
-    // view uses a slightly tighter 3.5 so dense metros read as tighter dots,
-    // while zoomed regional views stay at 4. `region` is null for the
-    // national map, truthy for a zoomed region. IMPORTANT: this same value
-    // must feed BOTH the singlePointRef calibration below AND the real render
-    // further down, or the colormap scale would no longer match the data.
+    // Bandwidth per zoom level: tighter 3.5 for the national US map, 4 for
+    // zoomed regional views. `region` is null nationally, truthy when zoomed.
     const HEATMAP_BANDWIDTH = region ? 4 : 3.5;
+    const CELL = 2;
 
-    const calCs = contourDensity()
-      .x((d) => d[0])
-      .y((d) => d[1])
-      .weight((d) => Math.sqrt(d[2]))
-      .size([viewBoxW, viewBoxH])
-      .cellSize(2)
-      .bandwidth(HEATMAP_BANDWIDTH)
-      .thresholds(40)([[viewBoxW / 2, viewBoxH / 2, 1]]);
-    const singlePointRef = calCs.length ? calCs[calCs.length - 1].value : 0.001;
+    // singlePointRef: the peak density one isolated species (at one location)
+    // produces. With the Gaussian kernel this is exactly 1.0 and — crucially —
+    // it does NOT move as the user's data grows, so the colormap scale is
+    // stable. Densities are now interpretable as "distinct species present":
+    //   1× ref  = one distinct species
+    //   12× ref = SATURATION_N distinct species → fully saturated red
+    const singlePointRef = singleSpeciesPeak();
 
-    // Step 2: define FIXED density thresholds tied to singlePointRef.
-    // d3-contour's default `thresholds(n)` generates n evenly-spaced
-    // levels across the data's full range — which adapts to data so that
-    // contours redistribute across whatever range exists. That sounds
-    // good but fails our use case: when a cluster's peak density is much
-    // larger than an isolated point's density, the lowest auto-threshold
-    // can be HIGHER than an isolated point's peak, so the isolated point
-    // generates no contours at all.
-    //
-    // By fixing thresholds at multiples of singlePointRef, we guarantee
-    // every density level always has the same meaning:
-    //   - At 0.3× ref: edge of a single isolated weight-1 point
-    //   - At 1× ref: peak of an isolated point
-    //   - At 12× ref (SATURATION_N): "fully saturated red"
-    //   - Above 12×: still red, but extra rings give visual depth inside
-    //     dense clusters
-    // 40 thresholds (was 28) spread across this range give us smooth color
-    // gradients with detail at both ends — bumped so the curve compression
-    // doesn't show visible banding in the long blue/green portion of the
-    // ramp where many contour lines now cluster.
+    // Build the distinct-species density grid (max-within-species, sum-across-
+    // species) and contour it at fixed thresholds tied to singlePointRef, so
+    // every level always means the same number of distinct species. Fixed
+    // thresholds (vs d3's data-adaptive auto-thresholds) keep isolated points
+    // visible even when a dense cluster exists elsewhere.
+    const { grid, gw, gh } = distinctSpeciesGrid(projected, viewBoxW, viewBoxH, HEATMAP_BANDWIDTH, CELL);
+
     const tHi = singlePointRef * HEATMAP_SATURATION_N;
     const tLo = singlePointRef * 0.3;
     const thresholds = Array.from({ length: 40 }, (_, i) =>
       tLo + (tHi - tLo) * (i / 39)
     );
 
-    const dc = contourDensity()
-      .x((d) => d[0])
-      .y((d) => d[1])
-      .weight((d) => Math.sqrt(d[2]))
-      .size([viewBoxW, viewBoxH])
-      .cellSize(2)
-      .bandwidth(HEATMAP_BANDWIDTH)
-      .thresholds(thresholds);
-    const cs = dc(projected);
-    const maxV = cs.length ? cs[cs.length - 1].value : 0;
+    let cs = d3contours().size([gw, gh]).thresholds(thresholds)(grid);
+    // d3.contours returns polygon coords in GRID space; scale back to viewBox
+    // space (×CELL) so they render under the identity-projection PIXEL_PATH.
+    cs = cs.map((c) => ({
+      ...c,
+      coordinates: c.coordinates.map((poly) =>
+        poly.map((ring) => ring.map(([x, y]) => [x * CELL, y * CELL]))
+      ),
+    }));
+    let maxV = 0;
+    for (const v of grid) if (v > maxV) maxV = v;
 
     return {
       contours: cs,
