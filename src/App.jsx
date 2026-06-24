@@ -5946,8 +5946,8 @@ function SightingsMapView({
   // 1. Lower 48 regions: target a fixed 1.3 miles-per-pixel resolution at the
   //    region's centroid. Each region's viewBox is sized to contain the
   //    geometry at that fixed scale, so a heat blob in Charlotte and a heat
-  //    blob in Seattle represent the same real-world radius (≈ 5.2 mi for
-  //    the regional bandwidth of 4). This makes cross-region comparison
+  //    blob in Seattle represent the same real-world radius (≈ 6.5 mi for
+  //    the regional bandwidth of 5). This makes cross-region comparison
   //    meaningful and prevents tiny regions from over-zooming while large
   //    ones starve for detail.
   //
@@ -6079,9 +6079,9 @@ function SightingsMapView({
       return { contours: [], projectedCount: 0, maxValue: 0, singlePointRef: 0, totalSpeciesAcrossLocations: 0, totalLocations: 0 };
     }
 
-    // Bandwidth per zoom level: tighter 3.5 for the national US map, 4 for
+    // Bandwidth per zoom level: tighter 3.5 for the national US map, 5 for
     // zoomed regional views. `region` is null nationally, truthy when zoomed.
-    const HEATMAP_BANDWIDTH = region ? 4 : 3.5;
+    const HEATMAP_BANDWIDTH = region ? 5 : 3.5;
     const CELL = 2;
 
     // singlePointRef: the peak density one isolated species (at one location)
@@ -6515,7 +6515,11 @@ function SightingsMapView({
         </div>
       </header>
 
-      {/* Filter pills — coral when active, white otherwise */}
+      {/* Filter pills (All sightings / First sightings) — temporarily hidden.
+          The `mode` state still defaults to 'all', so the map shows all
+          sightings and the first-sightings heat logic remains fully intact.
+          To bring the toggle back, un-comment this block. */}
+      {/*
       <div className="anim-2 mb-3 grid grid-cols-2 gap-2 shrink-0">
         <button
           onClick={() => setMode('all')}
@@ -6539,6 +6543,7 @@ function SightingsMapView({
           First sightings
         </button>
       </div>
+      */}
 
       {/* Map card — flex-1 to consume remaining vertical space so the page
           fits the viewport without scrolling. Cream gradient background to
