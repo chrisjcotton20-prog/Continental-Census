@@ -5846,10 +5846,10 @@ function SightingsMapView({
   // 1. Lower 48 regions: target a fixed 1.3 miles-per-pixel resolution at the
   //    region's centroid. Each region's viewBox is sized to contain the
   //    geometry at that fixed scale, so a heat blob in Charlotte and a heat
-  //    blob in Seattle represent the same real-world radius (≈ 6.5 mi for
-  //    the 5-pixel bandwidth). This makes cross-region comparison meaningful
-  //    and prevents tiny regions from over-zooming while large ones starve
-  //    for detail.
+  //    blob in Seattle represent the same real-world radius (≈ 5.2 mi for
+  //    the regional bandwidth of 4). This makes cross-region comparison
+  //    meaningful and prevents tiny regions from over-zooming while large
+  //    ones starve for detail.
   //
   // 2. Alaska and Hawaii: keep the existing fit-to-viewBox behavior with
   //    their region-specific conic params (REGION_PROJ_FN). AK and HI are
@@ -5988,13 +5988,21 @@ function SightingsMapView({
     //
     // We use a high threshold count here so the last contour level lands
     // close to the actual peak density, not a coarse approximation.
+    // Bandwidth (kernel blob size) is set per zoom level: the national US
+    // view uses a slightly tighter 3.5 so dense metros read as tighter dots,
+    // while zoomed regional views stay at 4. `region` is null for the
+    // national map, truthy for a zoomed region. IMPORTANT: this same value
+    // must feed BOTH the singlePointRef calibration below AND the real render
+    // further down, or the colormap scale would no longer match the data.
+    const HEATMAP_BANDWIDTH = region ? 4 : 3.5;
+
     const calCs = contourDensity()
       .x((d) => d[0])
       .y((d) => d[1])
       .weight((d) => Math.sqrt(d[2]))
       .size([viewBoxW, viewBoxH])
       .cellSize(2)
-      .bandwidth(4)
+      .bandwidth(HEATMAP_BANDWIDTH)
       .thresholds(40)([[viewBoxW / 2, viewBoxH / 2, 1]]);
     const singlePointRef = calCs.length ? calCs[calCs.length - 1].value : 0.001;
 
@@ -6030,7 +6038,7 @@ function SightingsMapView({
       .weight((d) => Math.sqrt(d[2]))
       .size([viewBoxW, viewBoxH])
       .cellSize(2)
-      .bandwidth(4)
+      .bandwidth(HEATMAP_BANDWIDTH)
       .thresholds(thresholds);
     const cs = dc(projected);
     const maxV = cs.length ? cs[cs.length - 1].value : 0;
