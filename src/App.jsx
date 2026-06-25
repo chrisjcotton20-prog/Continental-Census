@@ -3231,6 +3231,13 @@ export default function BirdLifeTracker() {
   // full-page heatmap. Keeping this on the parent (rather than a route) lets
   // us swap the entire content area without losing state in the other view.
   const [view, setView] = useState('dashboard');
+
+  // Whenever the top-level view changes (dashboard ⇄ map ⇄ badges), reset the
+  // scroll position to the top so each page opens at its header rather than
+  // wherever the previous page was scrolled to.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [view]);
   const [showInstall, setShowInstall] = useState(false);
   // Deferred install prompt from Chrome/Edge/Samsung Internet — captured at
   // load time, fired only when the user clicks our install button. iOS Safari
@@ -3700,7 +3707,7 @@ export default function BirdLifeTracker() {
       `}</style>
 
       {view === 'dashboard' && (
-      <div className="relative max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <div className="relative max-w-3xl mx-auto px-4 sm:px-6 py-3 sm:py-5">
         {/* ===== Chunky sky banner header =====
             Sits at the top of every dashboard view. Sky-blue gradient with a
             thick dark border + offset shadow (signature AC button look). The
@@ -3708,7 +3715,7 @@ export default function BirdLifeTracker() {
             the settings cog floats on the right as a chunky white circle.
             Decorative clouds drift in the background. */}
         <header
-          className="anim-1 relative overflow-hidden rounded-3xl mb-5"
+          className="anim-1 relative overflow-hidden rounded-3xl mb-3"
           style={{
             background: 'linear-gradient(135deg, #7cc4e8 0%, #a8dff5 60%, #c5e8ff 100%)',
             border: '3px solid #2a5680',
@@ -3894,13 +3901,13 @@ export default function BirdLifeTracker() {
               type="button"
               onClick={openAllSpecies}
               aria-label="Browse all 774 species"
-              className="anim-2 mb-5 relative w-full block text-center lift"
+              className="anim-2 mb-3 relative w-full block text-center lift"
               style={{
                 background: 'linear-gradient(180deg, #fff 0%, #fff8e8 100%)',
                 border: '3px solid #2a3445',
                 boxShadow: '0 5px 0 0 #2a3445',
                 borderRadius: 22,
-                padding: '18px 20px 16px',
+                padding: '12px 20px 12px',
                 cursor: 'pointer',
               }}
             >
@@ -4030,7 +4037,7 @@ export default function BirdLifeTracker() {
                 Each tile is a chunky rounded card with thick dark border +
                 offset shadow + colored fill + illustrated icon.
                 ===== */}
-            <div className="grid grid-cols-2 gap-2.5 mb-4 anim-5">
+            <div className="grid grid-cols-2 gap-2.5 mb-2.5 anim-5">
               {/* Observations (sky theme) */}
               <div
                 style={{
@@ -4138,7 +4145,7 @@ export default function BirdLifeTracker() {
                 Browse-all moved up under the hero. This row now holds only
                 the eBird-API-powered "find missed birds" affordance (and any
                 future tools we add). */}
-            <div className="anim-5 flex flex-wrap items-center gap-2 mb-4">
+            <div className="anim-5 flex flex-wrap items-center gap-2 mb-2.5">
               {userCount != null && (
                 <button
                   onClick={() => setShowTips(true)}
@@ -4154,13 +4161,13 @@ export default function BirdLifeTracker() {
             {points && points.length > 0 && (
               <button
                 onClick={() => setView('map')}
-                className="anim-5 w-full inline-flex items-center justify-between gap-3 mb-4"
+                className="anim-5 w-full inline-flex items-center justify-between gap-3 mb-2.5"
                 style={{
                   background: 'linear-gradient(180deg, #7dd3a4 0%, #5cba87 100%)',
                   border: '3px solid #2e6b4f',
                   boxShadow: '0 5px 0 0 #2e6b4f',
                   borderRadius: 20,
-                  padding: '14px 18px',
+                  padding: '11px 18px',
                   color: '#fff',
                 }}
               >
@@ -4206,13 +4213,13 @@ export default function BirdLifeTracker() {
             {points && points.length > 0 && (
               <button
                 onClick={() => setView('badges')}
-                className="anim-5 w-full inline-flex items-center justify-between gap-3 mb-4"
+                className="anim-5 w-full inline-flex items-center justify-between gap-3 mb-2.5"
                 style={{
                   background: 'linear-gradient(180deg, #ffd97a 0%, #f5b942 100%)',
                   border: '3px solid #2a3445',
                   boxShadow: '0 5px 0 0 #2a3445',
                   borderRadius: 20,
-                  padding: '14px 18px',
+                  padding: '11px 18px',
                   color: '#2a3445',
                 }}
               >
@@ -6127,7 +6134,11 @@ function BadgesView({ seenSci, userCount, atRiskSeen, regionNativeCount, onBack 
   }, [stats]);
 
   return (
-    <div className="anim-1 flex flex-col gap-3 pb-6">
+    <div
+      className="relative max-w-3xl mx-auto px-4 sm:px-8 py-4 sm:py-6 flex flex-col"
+      style={{ minHeight: '100vh' }}
+    >
+      <div className="anim-1 flex flex-col gap-3 pb-6">
       {/* header — chunky gold banner */}
       <header
         className="anim-1 relative flex items-center justify-between mb-1 shrink-0"
@@ -6244,6 +6255,7 @@ function BadgesView({ seenSci, userCount, atRiskSeen, regionNativeCount, onBack 
           </section>
         );
       })}
+      </div>
     </div>
   );
 }
