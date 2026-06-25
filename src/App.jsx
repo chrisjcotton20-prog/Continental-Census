@@ -3707,7 +3707,10 @@ export default function BirdLifeTracker() {
       `}</style>
 
       {view === 'dashboard' && (
-      <div className="relative max-w-3xl mx-auto px-4 sm:px-6 py-3 sm:py-5">
+      <div
+        className="relative max-w-3xl mx-auto px-4 sm:px-6 py-3 sm:py-5 flex flex-col"
+        style={{ minHeight: '100dvh' }}
+      >
         {/* ===== Chunky sky banner header =====
             Sits at the top of every dashboard view. Sky-blue gradient with a
             thick dark border + offset shadow (signature AC button look). The
@@ -3720,7 +3723,7 @@ export default function BirdLifeTracker() {
             background: 'linear-gradient(135deg, #7cc4e8 0%, #a8dff5 60%, #c5e8ff 100%)',
             border: '3px solid #2a5680',
             boxShadow: '0 5px 0 0 #2a5680',
-            padding: '14px 16px 16px',
+            padding: 'clamp(8px, 1.6dvh, 14px) 16px clamp(10px, 1.8dvh, 16px)',
           }}
         >
           <div className="absolute top-1.5 right-16 pointer-events-none"><Cloud size={48} opacity={0.85} /></div>
@@ -3886,7 +3889,13 @@ export default function BirdLifeTracker() {
         )}
 
         {!empty && hydrated && (
-          <main>
+          <main className="flex-1 flex flex-col">
+            {/* The hero card, collection grid, and CTAs sit in a flex group
+                that grows to fill the screen, distributing leftover vertical
+                space evenly between sections (justify-between) so the layout
+                fits one viewport on any device height. The footer below is
+                pushed past the fold on short screens. */}
+            <div className="flex-1 flex flex-col justify-between gap-2" style={{ minHeight: 0 }}>
             {/* ===== Hero count card — TAPPABLE =====
                 The whole card is a button. Tap anywhere on it to open the
                 full species index. Visually identical to the previous div
@@ -3901,13 +3910,13 @@ export default function BirdLifeTracker() {
               type="button"
               onClick={openAllSpecies}
               aria-label="Browse all 774 species"
-              className="anim-2 mb-3 relative w-full block text-center lift"
+              className="anim-2 relative w-full block text-center lift"
               style={{
                 background: 'linear-gradient(180deg, #fff 0%, #fff8e8 100%)',
                 border: '3px solid #2a3445',
                 boxShadow: '0 5px 0 0 #2a3445',
                 borderRadius: 22,
-                padding: '12px 20px 12px',
+                padding: 'clamp(6px, 1.5dvh, 12px) 20px',
                 cursor: 'pointer',
               }}
             >
@@ -3952,7 +3961,8 @@ export default function BirdLifeTracker() {
                   className="font-display"
                   style={{
                     fontWeight: 700,
-                    fontSize: 'clamp(4rem, 18vw, 6rem)',
+                    fontSize: 'clamp(2.5rem, min(16vw, 9dvh), 6rem)',
+                    lineHeight: 0.95,
                     lineHeight: 0.92,
                     color: '#ff6b6b',
                     textShadow: '0 4px 0 #a83a3a, 0 5px 8px rgba(40,30,60,0.2)',
@@ -4019,7 +4029,7 @@ export default function BirdLifeTracker() {
             </button>
 
             {/* "Your collection" section title with yellow accent dot */}
-            <div className="anim-5 mb-2 mt-1 flex items-center gap-2">
+            <div className="anim-5 flex items-center gap-2">
               <span
                 style={{
                   width: 14, height: 14, borderRadius: '50%',
@@ -4037,13 +4047,13 @@ export default function BirdLifeTracker() {
                 Each tile is a chunky rounded card with thick dark border +
                 offset shadow + colored fill + illustrated icon.
                 ===== */}
-            <div className="grid grid-cols-2 gap-2.5 mb-2.5 anim-5">
+            <div className="grid grid-cols-2 gap-2.5 anim-5">
               {/* Observations (sky theme) */}
               <div
                 style={{
                   background: '#d8eef9', border: '2.5px solid #2a5680',
                   boxShadow: '0 4px 0 0 #2a5680', borderRadius: 18,
-                  padding: '12px 14px',
+                  padding: 'clamp(8px, 1.5dvh, 12px) 14px',
                 }}
               >
                 <div className="flex items-start gap-2">
@@ -4070,7 +4080,7 @@ export default function BirdLifeTracker() {
                 style={{
                   background: '#d8f3df', border: '2.5px solid #2e6b4f',
                   boxShadow: '0 4px 0 0 #2e6b4f', borderRadius: 18,
-                  padding: '12px 14px',
+                  padding: 'clamp(8px, 1.5dvh, 12px) 14px',
                 }}
               >
                 <div className="flex items-start gap-2">
@@ -4097,7 +4107,7 @@ export default function BirdLifeTracker() {
                 style={{
                   background: '#ffe0d4', border: '2.5px solid #a83a3a',
                   boxShadow: '0 4px 0 0 #a83a3a', borderRadius: 18,
-                  padding: '12px 14px',
+                  padding: 'clamp(8px, 1.5dvh, 12px) 14px',
                 }}
               >
                 <div className="flex items-start gap-2">
@@ -4121,7 +4131,7 @@ export default function BirdLifeTracker() {
                 style={{
                   background: '#fff3c4', border: '2.5px solid #c9a01a',
                   boxShadow: '0 4px 0 0 #c9a01a', borderRadius: 18,
-                  padding: '12px 14px',
+                  padding: 'clamp(8px, 1.5dvh, 12px) 14px',
                 }}
               >
                 <div className="flex items-start gap-2">
@@ -4145,7 +4155,7 @@ export default function BirdLifeTracker() {
                 Browse-all moved up under the hero. This row now holds only
                 the eBird-API-powered "find missed birds" affordance (and any
                 future tools we add). */}
-            <div className="anim-5 flex flex-wrap items-center gap-2 mb-2.5">
+            <div className="anim-5 flex flex-wrap items-center gap-2">
               {userCount != null && (
                 <button
                   onClick={() => setShowTips(true)}
@@ -4161,7 +4171,7 @@ export default function BirdLifeTracker() {
             {points && points.length > 0 && (
               <button
                 onClick={() => setView('map')}
-                className="anim-5 w-full inline-flex items-center justify-between gap-3 mb-2.5"
+                className="anim-5 w-full inline-flex items-center justify-between gap-3"
                 style={{
                   background: 'linear-gradient(180deg, #7dd3a4 0%, #5cba87 100%)',
                   border: '3px solid #2e6b4f',
@@ -4213,7 +4223,7 @@ export default function BirdLifeTracker() {
             {points && points.length > 0 && (
               <button
                 onClick={() => setView('badges')}
-                className="anim-5 w-full inline-flex items-center justify-between gap-3 mb-2.5"
+                className="anim-5 w-full inline-flex items-center justify-between gap-3"
                 style={{
                   background: 'linear-gradient(180deg, #ffd97a 0%, #f5b942 100%)',
                   border: '3px solid #2a3445',
@@ -4254,6 +4264,9 @@ export default function BirdLifeTracker() {
               </button>
             )}
 
+            </div>
+            {/* below-the-fold supplementary content: excluded-species note +
+                footer. Not part of the space-distributing flex group. */}
             {csvMeta?.allCount != null && userCount != null && csvMeta.allCount > userCount && (
               <div className="mt-6 anim-5">
                 <div className="text-xs ink-soft leading-relaxed">
@@ -4264,7 +4277,9 @@ export default function BirdLifeTracker() {
               </div>
             )}
 
-            <div className="mt-10 pt-6 border-t rule flex flex-wrap items-center justify-between gap-4 anim-5">
+            {/* footer — sits after the flex group, naturally below the fold on
+                short screens (it's not part of the space-distributing group). */}
+            <div className="mt-6 pt-5 border-t rule flex flex-wrap items-center justify-between gap-4 anim-5">
               <div className="font-mono text-[10px] ink-faint tracking-wider">
                 <div>Updated <span className="ink-soft">{csvMeta ? relativeTime(csvMeta.updatedAt) : '—'}</span></div>
                 <div className="mt-0.5 flex items-center gap-2 flex-wrap">
