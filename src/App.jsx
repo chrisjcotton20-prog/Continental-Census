@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Papa from 'papaparse';
-import { Upload, RefreshCw, Settings, AlertCircle, Check, X, FileText, Feather, List, Search, Square, CheckSquare, Map as MapIcon, ChevronLeft, ChevronRight, Share2, Plus, Download, ArrowLeftRight, Home, Lightbulb, MapPin, Calendar, Eye, Anchor, Moon } from 'lucide-react';
+import { Upload, RefreshCw, Settings, AlertCircle, Check, X, FileText, Feather, List, Search, Square, CheckSquare, Map as MapIcon, ChevronLeft, ChevronRight, Share2, Plus, Download, ArrowLeftRight, Home, Lightbulb, MapPin, Calendar, Eye, Anchor, Moon, Award, Lock, Trophy, Globe, Sparkles } from 'lucide-react';
 import { storage } from './lib/storage.js';
 import { BluebirdMascot, Cardinal, Cloud, Sparkle, Compass, TreeIcon, HeartIcon, EyeIcon, CalendarIcon, ChecklistIcon, CURRENT_MASCOT } from './Illustrations.jsx';
 import { geoAlbersUsa, geoAlbers, geoPath, geoContains, geoCentroid } from 'd3-geo';
@@ -1182,6 +1182,89 @@ const SPECIALIZED_SCI = new Set([
   'Leucosticte atrata', 'Leucosticte australis',
 ]);
 const isSpecializedSci = (sci) => !!sci && SPECIALIZED_SCI.has(sci);
+
+// ----------------------------------------------------------------------------
+// Achievement badges.
+//
+// Each badge group is a category with one or more tiers. A tier unlocks when
+// the user's `value` for that category reaches the tier's `threshold`. The
+// page renders all tiers, greying out locked ones, and shows progress toward
+// the next. Everything is derived from already-computed stats (species count,
+// regions explored, threatened seen, trait counts) — no new tracking needed.
+//
+// A "stats" object is assembled at render time and passed to each group's
+// `value(stats)` selector. Tiers are sorted ascending by threshold.
+// ----------------------------------------------------------------------------
+const LOWER_48_REGION_IDS = ['pnw', 'cal', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se']; // excludes ak, hi
+const ALL_REGION_IDS = ['pnw', 'cal', 'ak', 'hi', 'sw', 'rm', 'gp', 'sp', 'mw', 'ne', 'se'];
+
+const BADGE_GROUPS = [
+  {
+    id: 'species',
+    title: 'Life List',
+    blurb: 'Total native species observed',
+    icon: 'feather',
+    accent: '#5cba87',
+    value: (s) => s.speciesCount,
+    tiers: [
+      { threshold: 50,  name: 'Fledgling',     desc: '50 species' },
+      { threshold: 100, name: 'Birder',        desc: '100 species' },
+      { threshold: 200, name: 'Keen Eye',      desc: '200 species' },
+      { threshold: 300, name: 'Field Expert',  desc: '300 species' },
+      { threshold: 400, name: 'Veteran',       desc: '400 species' },
+      { threshold: 500, name: 'Master Lister', desc: '500 species' },
+      { threshold: 600, name: 'Continental',   desc: '600 species' },
+      { threshold: 700, name: 'Legend',        desc: '700 species' },
+      { threshold: 774, name: 'The Full 774',  desc: 'Every native species' },
+    ],
+  },
+  {
+    id: 'regions',
+    title: 'Explorer',
+    blurb: 'Regions where you’ve recorded a species',
+    icon: 'globe',
+    accent: '#6cb8e4',
+    value: (s) => s.regionCount,
+    tiers: [
+      { threshold: 2,  name: 'Wanderer',        desc: '2 regions' },
+      { threshold: 5,  name: 'Roamer',          desc: '5 regions' },
+      { threshold: 9,  name: 'Lower 48',        desc: 'All 9 lower-48 regions', custom: 'lower48' },
+      { threshold: 11, name: 'Coast to Coast',  desc: 'All 11 regions (incl. AK & HI)' },
+    ],
+  },
+  {
+    id: 'threatened',
+    title: 'Guardian',
+    blurb: 'IUCN-threatened species observed',
+    icon: 'shield',
+    accent: '#c9a01a',
+    value: (s) => s.threatenedCount,
+    tiers: [
+      { threshold: 1,  name: 'First Watch',   desc: 'First threatened species' },
+      { threshold: 10, name: 'Sentinel',      desc: '10 threatened species' },
+      { threshold: 20, name: 'Protector',     desc: '20 threatened species' },
+      { threshold: 30, name: 'Conservator',   desc: '30 threatened species' },
+      { threshold: 40, name: 'Steward',       desc: '40 threatened species' },
+      { threshold: 50, name: 'Custodian',     desc: '50 threatened species' },
+      { threshold: 61, name: 'Last Stand',    desc: 'All 61 at-risk species' },
+    ],
+  },
+  {
+    id: 'traits',
+    title: 'Specialist',
+    blurb: 'Tougher kinds of birds to find',
+    icon: 'sparkles',
+    accent: '#ff6b6b',
+    // trait group is special: each tier checks a DIFFERENT boolean, not a count.
+    custom: 'traits',
+    tiers: [
+      { key: 'pelagic',     name: 'Sea Legs',            desc: 'See your first pelagic species' },
+      { key: 'nocturnal',   name: 'Night Owl',           desc: 'See your first nocturnal species' },
+      { key: 'specialized', name: 'Off the Beaten Path', desc: 'See your first specialized species' },
+    ],
+  },
+];
+
 
 // ----------------------------------------------------------------------------
 // Per-species reference data for the detail card. These are STUBS to be filled
@@ -4119,6 +4202,51 @@ export default function BirdLifeTracker() {
               </button>
             )}
 
+            {/* ===== Badges CTA — chunky gold pill ===== */}
+            {points && points.length > 0 && (
+              <button
+                onClick={() => setView('badges')}
+                className="anim-5 w-full inline-flex items-center justify-between gap-3 mb-4"
+                style={{
+                  background: 'linear-gradient(180deg, #ffd97a 0%, #f5b942 100%)',
+                  border: '3px solid #2a3445',
+                  boxShadow: '0 5px 0 0 #2a3445',
+                  borderRadius: 20,
+                  padding: '14px 18px',
+                  color: '#2a3445',
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <Trophy size={40} className="flex-shrink-0" strokeWidth={2} />
+                  <div className="text-left">
+                    <div
+                      className="font-display"
+                      style={{ fontWeight: 700, fontSize: 18, letterSpacing: '0.01em', lineHeight: 1 }}
+                    >
+                      Badges
+                    </div>
+                    <div
+                      className="font-sans"
+                      style={{ fontWeight: 600, fontSize: 11, marginTop: 3, color: '#6b5a2e' }}
+                    >
+                      Achievements & milestones
+                    </div>
+                  </div>
+                </div>
+                <div
+                  style={{
+                    width: 32, height: 32, borderRadius: '50%',
+                    background: '#fff', border: '2.5px solid #2a3445',
+                    boxShadow: '0 2px 0 0 #2a3445',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#2a3445', fontWeight: 700, fontSize: 18,
+                  }}
+                >
+                  ›
+                </div>
+              </button>
+            )}
+
             {csvMeta?.allCount != null && userCount != null && csvMeta.allCount > userCount && (
               <div className="mt-6 anim-5">
                 <div className="text-xs ink-soft leading-relaxed">
@@ -4196,6 +4324,16 @@ export default function BirdLifeTracker() {
           locationCount={csvMeta?.locationCount || (points?.length ?? 0)}
           regionNativeCount={csvMeta?.regionNativeCount || {}}
           locations={locations || []}
+          onBack={() => setView('dashboard')}
+        />
+      )}
+
+      {view === 'badges' && (
+        <BadgesView
+          seenSci={seenSci}
+          userCount={userCount}
+          atRiskSeen={atRiskSeen}
+          regionNativeCount={csvMeta?.regionNativeCount || {}}
           onBack={() => setView('dashboard')}
         />
       )}
@@ -5930,6 +6068,186 @@ function heatColor(t) {
   const c = stops[stops.length - 1].c;
   return `rgba(${c[0]},${c[1]},${c[2]},${c[3]})`;
 }
+
+// ============================================================================
+// Badges page — achievement tiers across species count, regions explored,
+// threatened species, and specialist traits. All progress is derived from the
+// seen-species set + region counts; locked tiers render greyed out.
+// ============================================================================
+function BadgeIcon({ name, size = 22, color }) {
+  const props = { size, color, strokeWidth: 2.25 };
+  if (name === 'feather') return <Feather {...props} />;
+  if (name === 'globe') return <Globe {...props} />;
+  if (name === 'shield') return <Award {...props} />;
+  if (name === 'sparkles') return <Sparkles {...props} />;
+  return <Trophy {...props} />;
+}
+
+function BadgesView({ seenSci, userCount, atRiskSeen, regionNativeCount, onBack }) {
+  // Assemble the stats the badge selectors read.
+  const stats = useMemo(() => {
+    const regionsWithSightings = Object.keys(regionNativeCount || {}).filter(
+      (r) => (regionNativeCount[r] || 0) > 0
+    );
+    const regionSet = new Set(regionsWithSightings);
+    const lower48Done = LOWER_48_REGION_IDS.every((r) => regionSet.has(r));
+    // trait booleans: has the user seen ANY species of each trait?
+    let pelagic = false, nocturnal = false, specialized = false;
+    for (const sci of seenSci) {
+      if (!pelagic && isPelagicSci(sci)) pelagic = true;
+      if (!nocturnal && isNocturnalSci(sci)) nocturnal = true;
+      if (!specialized && isSpecializedSci(sci)) specialized = true;
+      if (pelagic && nocturnal && specialized) break;
+    }
+    return {
+      speciesCount: userCount || 0,
+      regionCount: regionSet.size,
+      lower48Done,
+      threatenedCount: atRiskSeen || 0,
+      traits: { pelagic, nocturnal, specialized },
+    };
+  }, [seenSci, userCount, atRiskSeen, regionNativeCount]);
+
+  // total unlocked across everything, for the header tally
+  const { totalUnlocked, totalBadges } = useMemo(() => {
+    let unlocked = 0, total = 0;
+    for (const g of BADGE_GROUPS) {
+      for (const t of g.tiers) {
+        total++;
+        if (g.custom === 'traits') {
+          if (stats.traits[t.key]) unlocked++;
+        } else if (t.custom === 'lower48') {
+          if (stats.lower48Done) unlocked++;
+        } else if (g.value(stats) >= t.threshold) {
+          unlocked++;
+        }
+      }
+    }
+    return { totalUnlocked: unlocked, totalBadges: total };
+  }, [stats]);
+
+  return (
+    <div className="anim-1 flex flex-col gap-3 pb-6">
+      {/* header — chunky gold banner */}
+      <header
+        className="anim-1 relative flex items-center justify-between mb-1 shrink-0"
+        style={{
+          background: 'linear-gradient(135deg, #ffd97a 0%, #ffe9a8 100%)',
+          border: '3px solid #2a3445',
+          boxShadow: '0 4px 0 0 #2a3445',
+          borderRadius: 22,
+          padding: '12px 16px',
+        }}
+      >
+        <button
+          onClick={onBack}
+          aria-label="Back to home"
+          className="inline-flex items-center gap-1.5"
+          style={{
+            background: '#fff', border: '2.5px solid #2a3445', borderRadius: 999,
+            padding: '6px 14px 6px 10px', color: '#2a3445',
+            boxShadow: '0 2px 0 0 #2a3445', fontFamily: 'Fredoka, sans-serif', fontWeight: 600, fontSize: 14,
+          }}
+        >
+          <ChevronLeft size={16} strokeWidth={2.5} /> Home
+        </button>
+        <div className="font-display flex items-center gap-2" style={{ fontWeight: 700, fontSize: 20, color: '#2a3445', letterSpacing: '0.02em' }}>
+          BADGES <Trophy size={20} strokeWidth={2.25} />
+        </div>
+      </header>
+
+      {/* tally */}
+      <div className="text-center anim-2" style={{ marginTop: 2, marginBottom: 2 }}>
+        <span className="font-mono" style={{ fontSize: 13, color: '#2a3445', fontWeight: 600 }}>
+          {totalUnlocked}
+        </span>
+        <span className="font-mono" style={{ fontSize: 13, color: '#9a8a72' }}> / {totalBadges} unlocked</span>
+      </div>
+
+      {/* groups */}
+      {BADGE_GROUPS.map((g) => {
+        const current = g.custom === 'traits' ? null : g.value(stats);
+        // determine next locked threshold for progress (count groups only)
+        const nextTier = g.custom === 'traits' ? null
+          : g.tiers.find((t) => (t.custom === 'lower48' ? !stats.lower48Done : current < t.threshold));
+        return (
+          <section
+            key={g.id}
+            className="anim-3"
+            style={{ background: '#fffdf6', border: '2.5px solid #2a3445', borderRadius: 18, boxShadow: '0 3px 0 0 #2a3445', padding: '14px 14px 16px', overflow: 'hidden' }}
+          >
+            {/* group header */}
+            <div className="flex items-center gap-2.5 mb-1">
+              <div style={{ width: 34, height: 34, borderRadius: 10, background: g.accent, border: '2px solid #2a3445', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff8e8', flexShrink: 0 }}>
+                <BadgeIcon name={g.icon} size={19} color="#fff8e8" />
+              </div>
+              <div className="min-w-0">
+                <div className="font-display" style={{ fontWeight: 700, fontSize: 16, color: '#2a3445', lineHeight: 1.1 }}>{g.title}</div>
+                <div style={{ fontSize: 11, color: '#8a7a5e' }}>{g.blurb}</div>
+              </div>
+            </div>
+
+            {/* progress note for count groups */}
+            {g.custom !== 'traits' && nextTier && (
+              <div style={{ fontSize: 11, color: '#8a7a5e', margin: '4px 0 10px', fontStyle: 'italic' }}>
+                {nextTier.custom === 'lower48'
+                  ? `${stats.regionCount} / 9 lower-48 regions toward “${nextTier.name}”`
+                  : `${current} / ${nextTier.threshold} toward “${nextTier.name}”`}
+              </div>
+            )}
+            {g.custom !== 'traits' && !nextTier && (
+              <div style={{ fontSize: 11, color: g.accent, margin: '4px 0 10px', fontWeight: 600 }}>
+                All {g.title} badges unlocked! 🎉
+              </div>
+            )}
+            {g.custom === 'traits' && <div style={{ height: 8 }} />}
+
+            {/* tier grid */}
+            <div className="grid grid-cols-3 gap-2">
+              {g.tiers.map((t, i) => {
+                const unlocked = g.custom === 'traits'
+                  ? !!stats.traits[t.key]
+                  : (t.custom === 'lower48' ? stats.lower48Done : current >= t.threshold);
+                return (
+                  <div
+                    key={i}
+                    title={t.desc}
+                    style={{
+                      position: 'relative',
+                      background: unlocked ? '#fff8e8' : '#f0ece2',
+                      border: `2px solid ${unlocked ? '#2a3445' : '#cabfa8'}`,
+                      borderRadius: 12,
+                      padding: '10px 6px 8px',
+                      textAlign: 'center',
+                      boxShadow: unlocked ? '0 2px 0 0 #2a3445' : 'none',
+                      opacity: unlocked ? 1 : 0.65,
+                    }}
+                  >
+                    {/* medallion */}
+                    <div
+                      style={{
+                        width: 38, height: 38, borderRadius: '50%', margin: '0 auto 6px',
+                        background: unlocked ? g.accent : '#d8cfbb',
+                        border: `2px solid ${unlocked ? '#2a3445' : '#b6a98c'}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: unlocked ? '#fff8e8' : '#9a8a72',
+                      }}
+                    >
+                      {unlocked ? <BadgeIcon name={g.icon} size={18} color="#fff8e8" /> : <Lock size={15} strokeWidth={2.5} />}
+                    </div>
+                    <div className="font-display" style={{ fontSize: 11.5, fontWeight: 700, color: unlocked ? '#2a3445' : '#9a8a72', lineHeight: 1.1 }}>{t.name}</div>
+                    <div style={{ fontSize: 9, color: unlocked ? '#8a7a5e' : '#a89a7e', marginTop: 2, lineHeight: 1.15 }}>{t.desc}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
 
 function SightingsMapView({
   pointsAll,
