@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Papa from 'papaparse';
-import { Upload, RefreshCw, Settings, AlertCircle, Check, X, FileText, Feather, List, Search, Square, CheckSquare, Map as MapIcon, ChevronLeft, ChevronRight, Share2, Plus, Download, ArrowLeftRight, Home, Lightbulb, MapPin, Calendar, Eye, Anchor, Moon, Award, Lock, Trophy, Globe, Sparkles } from 'lucide-react';
+import { Upload, RefreshCw, Settings, AlertCircle, Check, X, FileText, Feather, List, Search, Square, CheckSquare, Map as MapIcon, ChevronLeft, ChevronRight, Share2, Plus, Download, ArrowLeftRight, Home, Lightbulb, MapPin, Calendar, Eye, Anchor, Moon, Award, Lock, Trophy, Globe, Sparkles, Waves, VenetianMask } from 'lucide-react';
 import { storage } from './lib/storage.js';
 import { BluebirdMascot, Cardinal, Cloud, Sparkle, Compass, TreeIcon, HeartIcon, EyeIcon, CalendarIcon, ChecklistIcon, CURRENT_MASCOT } from './Illustrations.jsx';
 import { geoAlbersUsa, geoAlbers, geoPath, geoContains, geoCentroid } from 'd3-geo';
@@ -1262,10 +1262,10 @@ const BADGE_GROUPS = [
     // trait group is special: each tier checks a DIFFERENT boolean, not a count.
     custom: 'traits',
     tiers: [
-      { key: 'pelagic',     name: 'Sea Legs',            desc: 'See your first pelagic species' },
-      { key: 'nocturnal',   name: 'Night Owl',           desc: 'See your first nocturnal species' },
-      { key: 'specialized', name: 'Off the Beaten Path', desc: 'See your first specialized species' },
-      { key: 'fowlplay',    name: 'Fowl Play',           desc: '10 non-native species in the US' },
+      { key: 'pelagic',     name: 'Sea Legs',            desc: 'See your first pelagic species',     icon: 'waves',     accent: '#1f7ab0' },
+      { key: 'nocturnal',   name: 'Night Owl',           desc: 'See your first nocturnal species',    icon: 'moonstars', accent: '#3b3270' },
+      { key: 'specialized', name: 'Off the Beaten Path', desc: 'See your first specialized species',  icon: 'boot',      accent: '#c2622a' },
+      { key: 'fowlplay',    name: 'Fowl Play',           desc: '10 non-native species in the US',     icon: 'mask',      accent: '#ff6b6b' },
     ],
   },
 ];
@@ -6142,6 +6142,31 @@ function BadgeIcon({ name, size = 22, color }) {
   if (name === 'globe') return <Globe {...props} />;
   if (name === 'shield') return <Award {...props} />;
   if (name === 'sparkles') return <Sparkles {...props} />;
+  // ---- per-badge Specialist icons ----
+  if (name === 'waves') return <Waves {...props} />;
+  if (name === 'mask') return <VenetianMask {...props} />;
+  // crescent moon surrounded by small stars (custom)
+  if (name === 'moonstars') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.25} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M16.5 14.5A6 6 0 0 1 9 7a6.3 6.3 0 0 1 .3-1.9A6.5 6.5 0 1 0 17 14.4a6.3 6.3 0 0 1-.5.1Z" fill={color} stroke="none" />
+        <path d="M18 3.5l.5 1.4 1.4.5-1.4.5-.5 1.4-.5-1.4L15.6 5l1.4-.5.5-1.4Z" fill={color} stroke="none" />
+        <circle cx="20.5" cy="9.5" r="0.9" fill={color} stroke="none" />
+        <circle cx="14.5" cy="2.5" r="0.8" fill={color} stroke="none" />
+      </svg>
+    );
+  }
+  // single hiking-boot tread imprint (custom)
+  if (name === 'boot') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        {/* boot sole outline */}
+        <path d="M8 3.2c2.2 0 3.4 1.4 3.6 3.6.15 1.7.5 2.8 1.3 3.9.9 1.2 1.5 2.4 1.5 4.3 0 3.2-1.8 5.3-4.2 5.3S6 21.5 6 18.4c0-1.2.2-2 .2-3.4 0-1.3-.4-2.2-.6-3.6C5.2 9.4 5 7.9 5 6.6 5 4.3 6 3.2 8 3.2Z" fill={color} fillOpacity="0.16" />
+        {/* tread lugs */}
+        <path d="M6.2 9.3h5.4M6 12h5.8M6 14.7h6M6.4 17.4h5.4" />
+      </svg>
+    );
+  }
   return <Trophy {...props} />;
 }
 
@@ -6327,6 +6352,9 @@ function BadgesView({ seenSci, userCount, atRiskSeen, regionNativeCount, species
             <div className="grid grid-cols-3 gap-2">
               {g.tiers.map((t, i) => {
                 const unlocked = isTierUnlocked(g, t, stats);
+                // per-badge icon/color override (Specialist badges), else group
+                const tierAccent = t.accent || g.accent;
+                const tierIcon = t.icon || g.icon;
                 return (
                   <button
                     key={i}
@@ -6348,13 +6376,13 @@ function BadgesView({ seenSci, userCount, atRiskSeen, regionNativeCount, species
                     <div
                       style={{
                         width: 38, height: 38, borderRadius: '50%', margin: '0 auto 6px',
-                        background: unlocked ? g.accent : '#d8cfbb',
+                        background: unlocked ? tierAccent : '#d8cfbb',
                         border: `2px solid ${unlocked ? '#2a3445' : '#b6a98c'}`,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         color: unlocked ? '#fff8e8' : '#9a8a72',
                       }}
                     >
-                      {unlocked ? <BadgeIcon name={g.icon} size={18} color="#fff8e8" /> : <Lock size={15} strokeWidth={2.5} />}
+                      {unlocked ? <BadgeIcon name={tierIcon} size={18} color="#fff8e8" /> : <Lock size={15} strokeWidth={2.5} />}
                     </div>
                     <div className="font-display" style={{ fontSize: 11.5, fontWeight: 700, color: unlocked ? '#2a3445' : '#9a8a72', lineHeight: 1.1 }}>{t.name}</div>
                     <div style={{ fontSize: 9, color: unlocked ? '#8a7a5e' : '#a89a7e', marginTop: 2, lineHeight: 1.15 }}>{t.desc}</div>
@@ -6389,6 +6417,9 @@ function BadgesView({ seenSci, userCount, atRiskSeen, regionNativeCount, species
 // tiers show as earned without a precise date for now.
 // ----------------------------------------------------------------------------
 function BadgeDetailPopup({ group, tier, unlocked, earned, stats, onClose }) {
+  // per-badge icon/color override (Specialist badges), else group defaults
+  const accent = tier.accent || group.accent;
+  const icon = tier.icon || group.icon;
   // current progress value + target, for the "how earned" copy
   const isTrait = group.custom === 'traits';
   const isLower48 = tier.custom === 'lower48';
@@ -6459,7 +6490,7 @@ function BadgeDetailPopup({ group, tier, unlocked, earned, stats, onClose }) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* header — group accent gradient */}
-        <div style={{ background: group.accent, padding: '18px 16px 16px', position: 'relative', textAlign: 'center' }}>
+        <div style={{ background: accent, padding: '18px 16px 16px', position: 'relative', textAlign: 'center' }}>
           <button
             onClick={onClose}
             aria-label="Close"
@@ -6474,11 +6505,11 @@ function BadgeDetailPopup({ group, tier, unlocked, earned, stats, onClose }) {
               background: unlocked ? '#fff8e8' : 'rgba(255,248,232,0.55)',
               border: '3px solid #2a3445',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: unlocked ? group.accent : '#9a8a72',
+              color: unlocked ? accent : '#9a8a72',
               boxShadow: '0 3px 0 0 #2a3445',
             }}
           >
-            {unlocked ? <BadgeIcon name={group.icon} size={30} color={group.accent} /> : <Lock size={26} strokeWidth={2.5} />}
+            {unlocked ? <BadgeIcon name={icon} size={30} color={accent} /> : <Lock size={26} strokeWidth={2.5} />}
           </div>
           <div className="font-display" style={{ fontSize: 20, fontWeight: 700, color: '#fff8e8', lineHeight: 1.1, textShadow: '0 1px 0 rgba(42,52,69,0.35)' }}>{tier.name}</div>
           <div style={{ fontSize: 11, color: 'rgba(255,248,232,0.92)', marginTop: 2, fontWeight: 600 }}>{group.title} · {tier.desc}</div>
@@ -6507,7 +6538,7 @@ function BadgeDetailPopup({ group, tier, unlocked, earned, stats, onClose }) {
               rather than showing an "unavailable" placeholder. */}
           {unlocked && earnedDateStr && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#fffdf6', border: '2px solid #2a3445', borderRadius: 10, marginBottom: 10 }}>
-              <Calendar size={15} style={{ color: group.accent, flexShrink: 0 }} />
+              <Calendar size={15} style={{ color: accent, flexShrink: 0 }} />
               <div style={{ fontSize: 12, color: '#3a3228' }}>
                 Earned on <span style={{ fontWeight: 700 }}>{earnedDateStr}</span>
               </div>
@@ -6516,7 +6547,7 @@ function BadgeDetailPopup({ group, tier, unlocked, earned, stats, onClose }) {
 
           {/* how earned */}
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px', background: '#fffdf6', border: '2px solid #2a3445', borderRadius: 10 }}>
-            <Lightbulb size={15} style={{ color: group.accent, flexShrink: 0, marginTop: 1 }} />
+            <Lightbulb size={15} style={{ color: accent, flexShrink: 0, marginTop: 1 }} />
             <div style={{ fontSize: 12, lineHeight: 1.5, color: '#3a3228' }}>{howText}</div>
           </div>
         </div>
