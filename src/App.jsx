@@ -4213,7 +4213,7 @@ export default function BirdLifeTracker() {
                 onClick={() => setView('badges')}
                 className="anim-5 w-full inline-flex items-center justify-between gap-3"
                 style={{
-                  background: 'linear-gradient(180deg, #ffd97a 0%, #f5b942 100%)',
+                  background: 'linear-gradient(135deg, #ffd97a 0%, #ffe9a8 100%)',
                   border: '3px solid #2a3445',
                   boxShadow: '0 5px 0 0 #2a3445',
                   borderRadius: 20,
@@ -6180,7 +6180,7 @@ function BadgesView({ seenSci, userCount, atRiskSeen, regionNativeCount, onBack 
           <ChevronLeft size={16} strokeWidth={2.5} /> Home
         </button>
         <div className="font-display flex items-center gap-2" style={{ fontWeight: 700, fontSize: 20, color: '#2a3445', letterSpacing: '0.02em' }}>
-          BADGES <Trophy size={20} strokeWidth={2.25} />
+          Badges <Trophy size={20} strokeWidth={2.25} />
         </div>
       </header>
 
