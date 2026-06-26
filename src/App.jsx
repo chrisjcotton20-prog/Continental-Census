@@ -1226,10 +1226,13 @@ const BADGE_GROUPS = [
     accent: '#6cb8e4',
     value: (s) => s.regionCount,
     tiers: [
-      { threshold: 2,  name: 'Wanderer',        desc: '2 regions' },
-      { threshold: 5,  name: 'Roamer',          desc: '5 regions' },
-      { threshold: 9,  name: 'Lower 48',        desc: 'All 9 lower-48 regions', custom: 'lower48' },
-      { threshold: 11, name: 'Coast to Coast',  desc: 'All 11 regions (incl. AK & HI)' },
+      { threshold: 2,  name: 'Wanderer',          desc: '2 regions' },
+      { threshold: 5,  name: 'Roamer',            desc: '5 regions' },
+      { name: 'Island Hopping',     desc: 'Visit Hawaii',         custom: 'hawaii' },
+      { name: 'Polar Express',      desc: 'Visit Alaska',         custom: 'alaska' },
+      { name: 'Coast to Coast',     desc: 'An East & a West coast region', custom: 'coast' },
+      { threshold: 9,  name: 'Lower 48',          desc: 'All 9 lower-48 regions', custom: 'lower48' },
+      { threshold: 11, name: 'American Adventurer', desc: 'All 11 regions (incl. AK & HI)' },
     ],
   },
   {
@@ -1265,6 +1268,21 @@ const BADGE_GROUPS = [
   },
 ];
 
+// Single source of truth for whether a given tier is unlocked, handling both
+// the count-based tiers (threshold vs the group's value) and the custom-keyed
+// tiers (region milestones, coastal, trait booleans). Used by the tally, the
+// tile render, and the detail popup so the logic never drifts between them.
+function isTierUnlocked(group, tier, stats) {
+  if (group.custom === 'traits') return !!stats.traits[tier.key];
+  switch (tier.custom) {
+    case 'lower48': return !!stats.lower48Done;
+    case 'hawaii':  return !!stats.hawaiiDone;
+    case 'alaska':  return !!stats.alaskaDone;
+    case 'coast':   return !!stats.coastToCoastDone;
+    default: break;
+  }
+  return group.value(stats) >= tier.threshold;
+}
 
 // ----------------------------------------------------------------------------
 // Per-species reference data for the detail card. These are STUBS to be filled
@@ -6118,6 +6136,12 @@ function BadgesView({ seenSci, userCount, atRiskSeen, regionNativeCount, species
     );
     const regionSet = new Set(regionsWithSightings);
     const lower48Done = LOWER_48_REGION_IDS.every((r) => regionSet.has(r));
+    // single-region milestones + coastal achievement
+    const hawaiiDone = regionSet.has('hi');
+    const alaskaDone = regionSet.has('ak');
+    const hasEastCoast = regionSet.has('se') || regionSet.has('ne');
+    const hasWestCoast = regionSet.has('cal') || regionSet.has('pnw');
+    const coastToCoastDone = hasEastCoast && hasWestCoast;
     // trait booleans: has the user seen ANY species of each trait?
     let pelagic = false, nocturnal = false, specialized = false;
     for (const sci of seenSci) {
@@ -6130,6 +6154,9 @@ function BadgesView({ seenSci, userCount, atRiskSeen, regionNativeCount, species
       speciesCount: userCount || 0,
       regionCount: regionSet.size,
       lower48Done,
+      hawaiiDone,
+      alaskaDone,
+      coastToCoastDone,
       threatenedCount: atRiskSeen || 0,
       traits: { pelagic, nocturnal, specialized },
     };
@@ -6184,13 +6211,7 @@ function BadgesView({ seenSci, userCount, atRiskSeen, regionNativeCount, species
     for (const g of BADGE_GROUPS) {
       for (const t of g.tiers) {
         total++;
-        if (g.custom === 'traits') {
-          if (stats.traits[t.key]) unlocked++;
-        } else if (t.custom === 'lower48') {
-          if (stats.lower48Done) unlocked++;
-        } else if (g.value(stats) >= t.threshold) {
-          unlocked++;
-        }
+        if (isTierUnlocked(g, t, stats)) unlocked++;
       }
     }
     return { totalUnlocked: unlocked, totalBadges: total };
@@ -6241,9 +6262,9 @@ function BadgesView({ seenSci, userCount, atRiskSeen, regionNativeCount, species
       {/* groups */}
       {BADGE_GROUPS.map((g) => {
         const current = g.custom === 'traits' ? null : g.value(stats);
-        // determine next locked threshold for progress (count groups only)
+        // next locked tier for the progress note (first tier not yet unlocked)
         const nextTier = g.custom === 'traits' ? null
-          : g.tiers.find((t) => (t.custom === 'lower48' ? !stats.lower48Done : current < t.threshold));
+          : g.tiers.find((t) => !isTierUnlocked(g, t, stats));
         return (
           <section
             key={g.id}
@@ -6266,7 +6287,9 @@ function BadgesView({ seenSci, userCount, atRiskSeen, regionNativeCount, species
               <div style={{ fontSize: 11, color: '#8a7a5e', margin: '4px 0 10px', fontStyle: 'italic' }}>
                 {nextTier.custom === 'lower48'
                   ? `${stats.regionCount} / 9 lower-48 regions toward “${nextTier.name}”`
-                  : `${current} / ${nextTier.threshold} toward “${nextTier.name}”`}
+                  : nextTier.custom
+                    ? `Next up: “${nextTier.name}” — ${nextTier.desc}`
+                    : `${current} / ${nextTier.threshold} toward “${nextTier.name}”`}
               </div>
             )}
             {g.custom !== 'traits' && !nextTier && (
@@ -6279,9 +6302,7 @@ function BadgesView({ seenSci, userCount, atRiskSeen, regionNativeCount, species
             {/* tier grid */}
             <div className="grid grid-cols-3 gap-2">
               {g.tiers.map((t, i) => {
-                const unlocked = g.custom === 'traits'
-                  ? !!stats.traits[t.key]
-                  : (t.custom === 'lower48' ? stats.lower48Done : current >= t.threshold);
+                const unlocked = isTierUnlocked(g, t, stats);
                 return (
                   <button
                     key={i}
@@ -6365,6 +6386,18 @@ function BadgeDetailPopup({ group, tier, unlocked, earned, stats, onClose }) {
     howText = unlocked
       ? 'Unlocked by recording at least one species in all nine lower-48 regions.'
       : `Record a species in all nine lower-48 regions. You're at ${current} of 9.`;
+  } else if (tier.custom === 'hawaii') {
+    howText = unlocked
+      ? 'Unlocked by recording a species in the Hawaii region.'
+      : 'Record a species in the Hawaii region to unlock this badge.';
+  } else if (tier.custom === 'alaska') {
+    howText = unlocked
+      ? 'Unlocked by recording a species in the Alaska region.'
+      : 'Record a species in the Alaska region to unlock this badge.';
+  } else if (tier.custom === 'coast') {
+    howText = unlocked
+      ? 'Unlocked by recording species in both an East-coast region (Southeast or Northeast) and a West-coast region (California or Pacific Northwest).'
+      : 'Record a species in an East-coast region (Southeast or Northeast) and a West-coast region (California or Pacific Northwest) to unlock this badge.';
   } else if (group.id === 'species') {
     howText = unlocked
       ? `Unlocked by adding ${tier.threshold} distinct native species to your life list.`
