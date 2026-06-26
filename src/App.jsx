@@ -4358,6 +4358,7 @@ export default function BirdLifeTracker() {
           userCount={userCount}
           atRiskSeen={atRiskSeen}
           regionNativeCount={csvMeta?.regionNativeCount || {}}
+          speciesStats={csvMeta?.speciesStats || {}}
           onBack={() => setView('dashboard')}
         />
       )}
@@ -6107,7 +6108,9 @@ function BadgeIcon({ name, size = 22, color }) {
   return <Trophy {...props} />;
 }
 
-function BadgesView({ seenSci, userCount, atRiskSeen, regionNativeCount, onBack }) {
+function BadgesView({ seenSci, userCount, atRiskSeen, regionNativeCount, speciesStats, onBack }) {
+  const [selected, setSelected] = useState(null); // { group, tier, unlocked, earnedDate }
+
   // Assemble the stats the badge selectors read.
   const stats = useMemo(() => {
     const regionsWithSightings = Object.keys(regionNativeCount || {}).filter(
@@ -6131,6 +6134,49 @@ function BadgesView({ seenSci, userCount, atRiskSeen, regionNativeCount, onBack 
       traits: { pelagic, nocturnal, specialized },
     };
   }, [seenSci, userCount, atRiskSeen, regionNativeCount]);
+
+  // Pre-sort the user's first-seen dates so we can derive WHEN a count-based
+  // threshold was crossed: the Nth earliest first-seen date is the day the Nth
+  // species was added, i.e. the day that tier unlocked. Built once.
+  const earnedDates = useMemo(() => {
+    const ss = speciesStats || {};
+    // all seen species' first-seen timestamps, ascending
+    const allDates = [];
+    const threatenedDates = [];
+    const traitFirst = { pelagic: null, nocturnal: null, specialized: null };
+    for (const sci of Object.keys(ss)) {
+      const iso = ss[sci] && ss[sci].first;
+      if (!iso) continue;
+      const ts = new Date(iso).getTime();
+      if (!Number.isFinite(ts)) continue;
+      allDates.push(ts);
+      if (AT_RISK_SCI.has(sci)) threatenedDates.push(ts);
+      if (isPelagicSci(sci) && (traitFirst.pelagic == null || ts < traitFirst.pelagic)) traitFirst.pelagic = ts;
+      if (isNocturnalSci(sci) && (traitFirst.nocturnal == null || ts < traitFirst.nocturnal)) traitFirst.nocturnal = ts;
+      if (isSpecializedSci(sci) && (traitFirst.specialized == null || ts < traitFirst.specialized)) traitFirst.specialized = ts;
+    }
+    allDates.sort((a, b) => a - b);
+    threatenedDates.sort((a, b) => a - b);
+    return { allDates, threatenedDates, traitFirst };
+  }, [speciesStats]);
+
+  // Given a group+tier that is unlocked, return the earned timestamp (ms) or
+  // null when it can't be precisely derived (e.g. region tiers, for now).
+  const earnedTimestamp = (group, tier, unlocked) => {
+    if (!unlocked) return null;
+    if (group.id === 'species') {
+      const arr = earnedDates.allDates;
+      return arr.length >= tier.threshold ? arr[tier.threshold - 1] : null;
+    }
+    if (group.id === 'threatened') {
+      const arr = earnedDates.threatenedDates;
+      return arr.length >= tier.threshold ? arr[tier.threshold - 1] : null;
+    }
+    if (group.custom === 'traits') {
+      return earnedDates.traitFirst[tier.key] || null;
+    }
+    return null; // regions: not precisely datable yet
+  };
 
   // total unlocked across everything, for the header tally
   const { totalUnlocked, totalBadges } = useMemo(() => {
@@ -6237,9 +6283,10 @@ function BadgesView({ seenSci, userCount, atRiskSeen, regionNativeCount, onBack 
                   ? !!stats.traits[t.key]
                   : (t.custom === 'lower48' ? stats.lower48Done : current >= t.threshold);
                 return (
-                  <div
+                  <button
                     key={i}
-                    title={t.desc}
+                    type="button"
+                    onClick={() => setSelected({ group: g, tier: t, unlocked, earned: earnedTimestamp(g, t, unlocked) })}
                     style={{
                       position: 'relative',
                       background: unlocked ? '#fff8e8' : '#f0ece2',
@@ -6249,6 +6296,7 @@ function BadgesView({ seenSci, userCount, atRiskSeen, regionNativeCount, onBack 
                       textAlign: 'center',
                       boxShadow: unlocked ? '0 2px 0 0 #2a3445' : 'none',
                       opacity: unlocked ? 1 : 0.65,
+                      cursor: 'pointer',
                     }}
                   >
                     {/* medallion */}
@@ -6265,13 +6313,151 @@ function BadgesView({ seenSci, userCount, atRiskSeen, regionNativeCount, onBack 
                     </div>
                     <div className="font-display" style={{ fontSize: 11.5, fontWeight: 700, color: unlocked ? '#2a3445' : '#9a8a72', lineHeight: 1.1 }}>{t.name}</div>
                     <div style={{ fontSize: 9, color: unlocked ? '#8a7a5e' : '#a89a7e', marginTop: 2, lineHeight: 1.15 }}>{t.desc}</div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
           </section>
         );
       })}
+      </div>
+
+      {/* badge detail popup */}
+      {selected && (
+        <BadgeDetailPopup
+          group={selected.group}
+          tier={selected.tier}
+          unlocked={selected.unlocked}
+          earned={selected.earned}
+          stats={stats}
+          onClose={() => setSelected(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// Badge detail popup — tap any badge tile to see what it is, whether it's been
+// earned, when, and how. Earned dates are precise for Life List, Threatened,
+// and Specialist badges (derived from the user's first-seen dates); region
+// tiers show as earned without a precise date for now.
+// ----------------------------------------------------------------------------
+function BadgeDetailPopup({ group, tier, unlocked, earned, stats, onClose }) {
+  // current progress value + target, for the "how earned" copy
+  const isTrait = group.custom === 'traits';
+  const isLower48 = tier.custom === 'lower48';
+  const current = isTrait ? null : group.value(stats);
+  const target = isTrait ? 1 : tier.threshold;
+
+  const earnedDateStr = earned
+    ? new Date(earned).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    : null;
+
+  // "How to earn / how earned" explanation per group.
+  let howText;
+  if (isTrait) {
+    const traitName = { pelagic: 'pelagic (open-ocean)', nocturnal: 'nocturnal', specialized: 'specialized / range-restricted' }[tier.key] || tier.key;
+    howText = unlocked
+      ? `Unlocked by observing your first ${traitName} species.`
+      : `Observe any ${traitName} species to unlock this badge.`;
+  } else if (isLower48) {
+    howText = unlocked
+      ? 'Unlocked by recording at least one species in all nine lower-48 regions.'
+      : `Record a species in all nine lower-48 regions. You're at ${current} of 9.`;
+  } else if (group.id === 'species') {
+    howText = unlocked
+      ? `Unlocked by adding ${tier.threshold} distinct native species to your life list.`
+      : `Add ${tier.threshold} distinct native species to your life list. You're at ${current} of ${tier.threshold}.`;
+  } else if (group.id === 'regions') {
+    howText = unlocked
+      ? `Unlocked by recording a species in ${tier.threshold} different regions.`
+      : `Record a species in ${tier.threshold} different regions. You're at ${current} of ${tier.threshold}.`;
+  } else if (group.id === 'threatened') {
+    howText = unlocked
+      ? `Unlocked by observing ${tier.threshold} IUCN-threatened ${tier.threshold === 1 ? 'species' : 'species'}.`
+      : `Observe ${tier.threshold} IUCN-threatened species. You're at ${current} of ${tier.threshold}.`;
+  } else {
+    howText = tier.desc;
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3"
+      style={{ background: 'rgba(42,52,69,0.5)', backdropFilter: 'blur(3px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full overflow-hidden flex flex-col"
+        style={{
+          maxWidth: 320, background: '#fff8e8',
+          border: '3px solid #2a3445', borderRadius: 22,
+          boxShadow: '0 8px 0 0 #2a3445, 0 30px 80px rgba(0,0,0,0.35)',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* header — group accent gradient */}
+        <div style={{ background: group.accent, padding: '18px 16px 16px', position: 'relative', textAlign: 'center' }}>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            style={{ position: 'absolute', top: 12, right: 12, width: 30, height: 30, borderRadius: '50%', background: '#fff8e8', border: '2.5px solid #2a3445', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2a3445' }}
+          >
+            <X size={15} strokeWidth={2.5} />
+          </button>
+          {/* medallion */}
+          <div
+            style={{
+              width: 64, height: 64, borderRadius: '50%', margin: '0 auto 10px',
+              background: unlocked ? '#fff8e8' : 'rgba(255,248,232,0.55)',
+              border: '3px solid #2a3445',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: unlocked ? group.accent : '#9a8a72',
+              boxShadow: '0 3px 0 0 #2a3445',
+            }}
+          >
+            {unlocked ? <BadgeIcon name={group.icon} size={30} color={group.accent} /> : <Lock size={26} strokeWidth={2.5} />}
+          </div>
+          <div className="font-display" style={{ fontSize: 20, fontWeight: 700, color: '#fff8e8', lineHeight: 1.1, textShadow: '0 1px 0 rgba(42,52,69,0.35)' }}>{tier.name}</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,248,232,0.92)', marginTop: 2, fontWeight: 600 }}>{group.title} · {tier.desc}</div>
+        </div>
+
+        {/* body */}
+        <div style={{ padding: '14px 16px 18px' }}>
+          {/* status pill */}
+          <div style={{ textAlign: 'center', marginBottom: 12 }}>
+            <span
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                background: unlocked ? '#5cba87' : '#e8dcc0',
+                color: unlocked ? '#10301f' : '#5a4a3e',
+                border: '2px solid #2a3445', borderRadius: 999, padding: '4px 12px',
+                fontSize: 12, fontWeight: 600,
+              }}
+            >
+              {unlocked ? <Check size={14} strokeWidth={3} /> : <Lock size={13} strokeWidth={2.5} />}
+              {unlocked ? 'Earned' : 'Locked'}
+            </span>
+          </div>
+
+          {/* earned date */}
+          {unlocked && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#fffdf6', border: '2px solid #2a3445', borderRadius: 10, marginBottom: 10 }}>
+              <Calendar size={15} style={{ color: group.accent, flexShrink: 0 }} />
+              <div style={{ fontSize: 12, color: '#3a3228' }}>
+                {earnedDateStr
+                  ? <>Earned on <span style={{ fontWeight: 700 }}>{earnedDateStr}</span></>
+                  : 'Earned (date unavailable)'}
+              </div>
+            </div>
+          )}
+
+          {/* how earned */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px', background: '#fffdf6', border: '2px solid #2a3445', borderRadius: 10 }}>
+            <Lightbulb size={15} style={{ color: group.accent, flexShrink: 0, marginTop: 1 }} />
+            <div style={{ fontSize: 12, lineHeight: 1.5, color: '#3a3228' }}>{howText}</div>
+          </div>
+        </div>
       </div>
     </div>
   );
