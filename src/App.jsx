@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Papa from 'papaparse';
-import { Upload, RefreshCw, Settings, AlertCircle, Check, X, FileText, Feather, List, Search, Square, CheckSquare, Map as MapIcon, ChevronLeft, ChevronRight, Share2, Plus, Download, ArrowLeftRight, Home, Lightbulb, MapPin, Calendar, Eye, Anchor, Moon, Award, Lock, Trophy, Globe, Sparkles, Waves, VenetianMask } from 'lucide-react';
+import { Upload, RefreshCw, Settings, AlertCircle, Check, X, FileText, Feather, List, Search, Square, CheckSquare, Map as MapIcon, ChevronLeft, ChevronRight, Share2, Plus, Download, ArrowLeftRight, Home, Lightbulb, MapPin, Calendar, Eye, Anchor, Moon, Award, Lock, Trophy, Globe, Sparkles, Waves, VenetianMask, Footprints } from 'lucide-react';
 import { storage } from './lib/storage.js';
 import { BluebirdMascot, Cardinal, Cloud, Sparkle, Compass, TreeIcon, HeartIcon, EyeIcon, CalendarIcon, ChecklistIcon, CURRENT_MASCOT } from './Illustrations.jsx';
 import { geoAlbersUsa, geoAlbers, geoPath, geoContains, geoCentroid } from 'd3-geo';
@@ -6145,36 +6145,20 @@ function BadgeIcon({ name, size = 22, color }) {
   // ---- per-badge Specialist icons ----
   if (name === 'waves') return <Waves {...props} />;
   if (name === 'mask') return <VenetianMask {...props} />;
-  // crescent moon (enlarged) surrounded by small stars (custom)
+  // crescent moon (lucide's clean crescent path) + simple round dot stars,
+  // one placed at the bottom-left so they aren't clustered in the corner.
   if (name === 'moonstars') {
     return (
       <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.25} strokeLinecap="round" strokeLinejoin="round">
-        {/* larger crescent, centered a touch lower-left to give the stars room */}
-        <path d="M17.5 15.2A7.2 7.2 0 1 1 8.8 4.2a7.6 7.6 0 1 0 9 11 7.6 7.6 0 0 1-.3.0Z" fill={color} stroke="none" />
-        {/* top-right star */}
-        <path d="M19 3l.55 1.55L21.1 5.1l-1.55.55L19 7.2l-.55-1.55L16.9 5.1l1.55-.55L19 3Z" fill={color} stroke="none" />
-        {/* top-left small star */}
-        <circle cx="6.5" cy="3.2" r="0.85" fill={color} stroke="none" />
-        {/* bottom-left star */}
-        <path d="M4.4 16.6l.42 1.2 1.2.42-1.2.42L4.4 19.86l-.42-1.2-1.2-.42 1.2-.42.42-1.2Z" fill={color} stroke="none" />
+        <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9" />
+        <circle cx="20.5" cy="4.2" r="1.05" fill={color} stroke="none" />
+        <circle cx="16.3" cy="2.4" r="0.7" fill={color} stroke="none" />
+        <circle cx="4.3" cy="17.2" r="1.0" fill={color} stroke="none" />
       </svg>
     );
   }
-  // single hiking-boot tread imprint (custom), centered in the 24×24 box
-  if (name === 'boot') {
-    return (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
-        {/* heel pad */}
-        <path d="M9 15.4c0-1 1.3-1.7 3-1.7s3 .7 3 1.7v3.1c0 1.5-1.3 2.6-3 2.6s-3-1.1-3-2.6Z" fill={color} fillOpacity="0.18" stroke={color} />
-        {/* forefoot pad */}
-        <path d="M9.1 6.3C9.1 4.2 10.4 3 12 3s2.9 1.2 2.9 3.3c0 1.7-.2 2.9-.5 4.2-.2 1-1.1 1.6-2.4 1.6s-2.2-.6-2.4-1.6c-.3-1.3-.5-2.5-.5-4.2Z" fill={color} fillOpacity="0.18" stroke={color} />
-        {/* tread lugs — forefoot */}
-        <path d="M10 6.2h4M10.1 8.1h3.8M10.4 9.9h3.2" strokeWidth={1.3} />
-        {/* tread lugs — heel */}
-        <path d="M10.2 16.3h3.6M10.1 18.1h3.8" strokeWidth={1.3} />
-      </svg>
-    );
-  }
+  // single hiking-boot tread imprint → lucide Footprints (clean library icon)
+  if (name === 'boot') return <Footprints {...props} />;
   return <Trophy {...props} />;
 }
 
