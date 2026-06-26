@@ -6251,12 +6251,19 @@ function BadgesView({ seenSci, userCount, atRiskSeen, regionNativeCount, species
         </div>
       </header>
 
-      {/* tally */}
-      <div className="text-center anim-2" style={{ marginTop: 2, marginBottom: 2 }}>
-        <span className="font-mono" style={{ fontSize: 13, color: '#2a3445', fontWeight: 600 }}>
-          {totalUnlocked}
+      {/* tally — a small cream pill so it stays legible against the blue
+          gradient background (plain tan text washed out). */}
+      <div className="text-center anim-2" style={{ marginTop: 4, marginBottom: 4 }}>
+        <span
+          className="font-mono inline-flex items-center"
+          style={{
+            fontSize: 13, fontWeight: 600, color: '#2a3445',
+            background: '#fff8e8', border: '2px solid #2a3445', borderRadius: 999,
+            padding: '3px 12px', boxShadow: '0 2px 0 0 #2a3445',
+          }}
+        >
+          {totalUnlocked}<span style={{ color: '#8a7a5e' }}>&nbsp;/ {totalBadges} unlocked</span>
         </span>
-        <span className="font-mono" style={{ fontSize: 13, color: '#9a8a72' }}> / {totalBadges} unlocked</span>
       </div>
 
       {/* groups */}
@@ -6282,22 +6289,16 @@ function BadgesView({ seenSci, userCount, atRiskSeen, regionNativeCount, species
               </div>
             </div>
 
-            {/* progress note for count groups */}
-            {g.custom !== 'traits' && nextTier && (
-              <div style={{ fontSize: 11, color: '#8a7a5e', margin: '4px 0 10px', fontStyle: 'italic' }}>
-                {nextTier.custom === 'lower48'
-                  ? `${stats.regionCount} / 9 lower-48 regions toward “${nextTier.name}”`
-                  : nextTier.custom
-                    ? `Next up: “${nextTier.name}” — ${nextTier.desc}`
-                    : `${current} / ${nextTier.threshold} toward “${nextTier.name}”`}
-              </div>
-            )}
-            {g.custom !== 'traits' && !nextTier && (
+            {/* "toward next badge" progress note removed — each tile already
+                shows its own X / N count, so the header note was redundant.
+                The all-unlocked celebration is kept. */}
+            {g.custom !== 'traits' && !nextTier ? (
               <div style={{ fontSize: 11, color: g.accent, margin: '4px 0 10px', fontWeight: 600 }}>
                 All {g.title} badges unlocked! 🎉
               </div>
+            ) : (
+              <div style={{ height: 8 }} />
             )}
-            {g.custom === 'traits' && <div style={{ height: 8 }} />}
 
             {/* tier grid */}
             <div className="grid grid-cols-3 gap-2">
@@ -6473,14 +6474,14 @@ function BadgeDetailPopup({ group, tier, unlocked, earned, stats, onClose }) {
             </span>
           </div>
 
-          {/* earned date */}
-          {unlocked && (
+          {/* earned date — only shown when we can derive a real date. Explorer
+              (region) badges don't compute one, so the row is simply omitted
+              rather than showing an "unavailable" placeholder. */}
+          {unlocked && earnedDateStr && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#fffdf6', border: '2px solid #2a3445', borderRadius: 10, marginBottom: 10 }}>
               <Calendar size={15} style={{ color: group.accent, flexShrink: 0 }} />
               <div style={{ fontSize: 12, color: '#3a3228' }}>
-                {earnedDateStr
-                  ? <>Earned on <span style={{ fontWeight: 700 }}>{earnedDateStr}</span></>
-                  : 'Earned (date unavailable)'}
+                Earned on <span style={{ fontWeight: 700 }}>{earnedDateStr}</span>
               </div>
             </div>
           )}
