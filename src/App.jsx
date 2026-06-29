@@ -2910,14 +2910,15 @@ async function fetchRecentAtLocation(locId, apiKey, back = 30) {
   );
 }
 
-// All observations at a hotspot on a specific date. Unlike the various "recent"
-// endpoints (which dedupe to one entry per species per location), historic
-// returns every individual observation submitted on that date — so we can
-// actually count how many distinct people reported a given bird. This is the
-// endpoint that powers the "≥ 2 separate observers" verification.
+// All observations at a hotspot on a specific date. We pass detail=full, which
+// is ESSENTIAL: without it eBird's historic endpoint returns "simple" detail —
+// one collapsed record per species (most-recent only) — making it impossible to
+// count distinct observers. detail=full returns every individual checklist's
+// record, each carrying its own subId (and userDisplayName when public), which
+// is exactly what the "≥ 2 separate observers" verification relies on.
 async function fetchHistoricAtLocation(locId, year, month, day, apiKey) {
   return ebirdFetch(
-    `/data/obs/${locId}/historic/${year}/${month}/${day}?maxResults=10000&includeProvisional=false`,
+    `/data/obs/${locId}/historic/${year}/${month}/${day}?detail=full&maxResults=10000&includeProvisional=false`,
     apiKey,
   );
 }
