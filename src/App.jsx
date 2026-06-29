@@ -2889,15 +2889,36 @@ const STORAGE = {
 const EBIRD_BASE = 'https://api.ebird.org/v2';
 const HOTSPOT_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-async function ebirdFetch(path, apiKey) {
-  const res = await fetch(`${EBIRD_BASE}${path}`, {
-    headers: { 'X-eBirdApiToken': apiKey },
-  });
-  if (!res.ok) {
+async function ebirdFetch(path, apiKey, { retries = 3 } = {}) {
+  let lastErr = null;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    let res;
+    try {
+      res = await fetch(`${EBIRD_BASE}${path}`, {
+        headers: { 'X-eBirdApiToken': apiKey },
+      });
+    } catch (networkErr) {
+      // transient network blip — retry with backoff
+      lastErr = networkErr;
+      await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+      continue;
+    }
+    if (res.ok) return res.json();
+    // 429 (rate limited) or 5xx (server) are transient — back off and retry.
+    if (res.status === 429 || res.status >= 500) {
+      lastErr = new Error(`eBird ${res.status}`);
+      lastErr.status = res.status;
+      // exponential-ish backoff: 600ms, 1200ms, 2400ms…
+      await new Promise((r) => setTimeout(r, 600 * Math.pow(2, attempt)));
+      continue;
+    }
+    // other (4xx) errors are not retryable — fail fast.
     const txt = await res.text().catch(() => '');
-    throw new Error(`eBird ${res.status}${txt ? ': ' + txt.slice(0, 120) : ''}`);
+    const err = new Error(`eBird ${res.status}${txt ? ': ' + txt.slice(0, 120) : ''}`);
+    err.status = res.status;
+    throw err;
   }
-  return res.json();
+  throw lastErr || new Error('eBird request failed');
 }
 
 // "Recent observations at a hotspot, last N days" — returns observations with
@@ -5450,6 +5471,7 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
 
       const observersByKey = new Map();
       const concurrency = 3;
+      let failedTasks = 0; // count of hotspot/day fetches that errored out
 
       for (let i = 0; i < tasks.length; i += concurrency) {
         const batch = tasks.slice(i, i + concurrency);
@@ -5464,6 +5486,7 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
             } catch (e) {
               console.warn('historic fetch failed for', t.loc.id, t.date.dateStr, e);
               hist = [];
+              failedTasks++;
             }
           }
           return { loc: t.loc, hist };
@@ -5480,7 +5503,7 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
           done: Math.min(i + concurrency, tasks.length),
           total: tasks.length,
         });
-        await new Promise((r) => setTimeout(r, 60));
+        await new Promise((r) => setTimeout(r, 120));
       }
 
       // Filter to species seen by 2+ distinct observers at the same hotspot.
@@ -5489,8 +5512,26 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
         if (entry.observers.size >= 2) verified.push(entry);
       }
 
-      setTips(buildTipsFromVerified(verified));
-      setCacheTimestamp(Date.now());
+      const next = buildTipsFromVerified(verified);
+
+      // Guard: a refresh that mostly failed (e.g. eBird rate-limiting the burst
+      // of requests) would otherwise come back empty and WIPE a good list. If a
+      // meaningful share of fetches failed AND the new result is empty while we
+      // already had results on screen, keep the existing list and warn instead
+      // of replacing it with a misleading "no birds found".
+      const failureRate = tasks.length ? failedTasks / tasks.length : 0;
+      const hadResults = Array.isArray(tips) && tips.length > 0;
+      if (next.length === 0 && failedTasks > 0 && (hadResults || failureRate > 0.25)) {
+        setError(
+          `eBird was rate-limiting (${failedTasks} of ${tasks.length} requests didn't complete). ` +
+          `${hadResults ? 'Keeping your last results.' : 'Try Refresh again in a moment.'}`
+        );
+        // Only refresh the timestamp if we kept a real list; don't claim freshness on empties.
+        if (hadResults) setCacheTimestamp((ts) => ts);
+      } else {
+        setTips(next);
+        setCacheTimestamp(Date.now());
+      }
     } catch (e) {
       setError(e.message || 'Fetch failed');
     } finally {
