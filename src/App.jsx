@@ -2879,6 +2879,7 @@ const STORAGE = {
   firstSightingPoints: 'ebird:firstSightingPoints',
   locations: 'ebird:locations',
   apiKey: 'ebird:apiKey',
+  homeLocation: 'ebird:homeLocation', // { zip, lat, lng, label }
   // Cached eBird API responses live under 'ebird:hotspot:{locId}'
 };
 
@@ -2942,6 +2943,42 @@ async function fetchHistoricAtLocation(locId, year, month, day, apiKey) {
     `/data/obs/${locId}/historic/${year}/${month}/${day}?detail=full&maxResults=10000&includeProvisional=false`,
     apiKey,
   );
+}
+
+// ---------- Home location: ZIP geocoding + distance ----------
+// Resolve a US ZIP to coordinates via a free, keyless geocoder. Runs in the
+// user's browser (not our build sandbox), and the result is cached locally so
+// this network call only happens when the user sets/changes their home ZIP.
+async function geocodeZip(zip) {
+  const clean = String(zip || '').trim();
+  if (!/^\d{5}$/.test(clean)) {
+    throw new Error('Enter a 5-digit US ZIP code.');
+  }
+  const res = await fetch(`https://api.zippopotam.us/us/${clean}`);
+  if (res.status === 404) throw new Error(`ZIP ${clean} not found.`);
+  if (!res.ok) throw new Error(`Lookup failed (${res.status}). Try again.`);
+  const data = await res.json();
+  const place = data.places && data.places[0];
+  if (!place) throw new Error(`No location for ZIP ${clean}.`);
+  const lat = parseFloat(place.latitude);
+  const lng = parseFloat(place.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    throw new Error('Got an invalid location back. Try again.');
+  }
+  const label = `${place['place name']}, ${place['state abbreviation']}`;
+  return { zip: clean, lat, lng, label };
+}
+
+// Great-circle distance in miles between two [lat,lng] points (haversine).
+function haversineMiles(lat1, lng1, lat2, lng2) {
+  const toRad = (d) => (d * Math.PI) / 180;
+  const R = 3958.8; // earth radius, miles
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
 }
 
 // Lightweight per-hotspot cache (IndexedDB via the existing storage helper)
@@ -5345,14 +5382,84 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [cacheTimestamp, setCacheTimestamp] = useState(null);
 
-  // Filter to locations the user has actually birded at (5+ native species).
-  // This trims out drive-by checklists and keeps focus on their "patches".
+  // Home location (resolved from a ZIP) used to prioritize nearby hotspots so
+  // a productive trip across the country doesn't dominate the list forever.
+  const [home, setHome] = useState(undefined); // undefined=loading, null=unset, {zip,lat,lng,label}=set
+  const [zipInput, setZipInput] = useState('');
+  const [zipBusy, setZipBusy] = useState(false);
+  const [zipError, setZipError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const saved = await storage.get(STORAGE.homeLocation).catch(() => null);
+      if (cancelled) return;
+      setHome(saved && Number.isFinite(saved.lat) ? saved : null);
+      if (saved?.zip) setZipInput(saved.zip);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  async function saveHomeZip() {
+    setZipError(null);
+    setZipBusy(true);
+    try {
+      const resolved = await geocodeZip(zipInput);
+      await storage.set(STORAGE.homeLocation, resolved);
+      setHome(resolved);
+      setTips(null);        // force a re-scan with the newly prioritized hotspots
+      setCacheTimestamp(null);
+    } catch (e) {
+      setZipError(e.message || 'Could not look up that ZIP.');
+    } finally {
+      setZipBusy(false);
+    }
+  }
+
+  async function clearHomeZip() {
+    await storage.del(STORAGE.homeLocation).catch(() => {});
+    setHome(null);
+    setZipInput('');
+    setZipError(null);
+    setTips(null);
+    setCacheTimestamp(null);
+  }
+
+  // How far a hotspot's "closeness" weight decays with distance (miles). At this
+  // distance a spot's species-richness weight is halved; nothing is hard-cut.
+  const DISTANCE_HALF_LIFE_MI = 25;
+  // When a home location is set, cap how many of the top-ranked hotspots we
+  // actually scan — keeps the focus local AND limits the API request burst.
+  const MAX_SCANNED_WITH_HOME = 25;
+
+  // Hotspots the user has birded (5+ native species). When a home location is
+  // set, rank by a blend of distance (closer = better) and species richness,
+  // then keep the top N. Without a home, fall back to richness-only (original).
   const targetLocations = useMemo(() => {
     if (!locations) return [];
-    return locations
-      .filter((l) => l.id && l.id.startsWith('L') && (l.species?.length || 0) >= 5)
-      .sort((a, b) => (b.species?.length || 0) - (a.species?.length || 0));
-  }, [locations]);
+    const eligible = locations.filter(
+      (l) => l.id && l.id.startsWith('L') && (l.species?.length || 0) >= 5
+    );
+    if (!home || !Number.isFinite(home.lat)) {
+      // no home set → original behavior: richest first, scan all
+      return eligible
+        .slice()
+        .sort((a, b) => (b.species?.length || 0) - (a.species?.length || 0));
+    }
+    // score = richness damped by distance. Soft ranking, wide net: far spots
+    // sink toward zero but aren't categorically excluded before the top-N cut.
+    const scored = eligible.map((l) => {
+      const distMi = haversineMiles(home.lat, home.lng, l.lat, l.lng);
+      const richness = l.species?.length || 0;
+      const score = richness / (1 + distMi / DISTANCE_HALF_LIFE_MI);
+      return { loc: l, distMi, score };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, MAX_SCANNED_WITH_HOME).map((s) => {
+      // attach distance for display; keep the original location shape intact
+      return Object.assign({}, s.loc, { _distMi: s.distMi });
+    });
+  }, [locations, home]);
 
   // On first open, assemble tips from any cached historic-day data. Anything
   // not in cache is simply absent from the result — the user fetches to fill
@@ -5604,6 +5711,66 @@ function TipsDrawer({ apiKey, locations, seenSci, onClose, onOpenSettings }) {
 
         {/* body */}
         <div className="relative flex-1 overflow-y-auto px-4 sm:px-6 py-4">
+          {/* Home location control — prioritizes nearby hotspots */}
+          {hasLocations && (
+            <div className="surface-1 rounded-2xl p-3.5 mb-3" style={{ border: '1px solid rgba(42,52,69,0.12)' }}>
+              {home && Number.isFinite(home.lat) ? (
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <MapPin size={15} className="rust shrink-0" />
+                    <div className="min-w-0">
+                      <div className="text-sm ink truncate" style={{ fontWeight: 600 }}>
+                        Near {home.label}
+                      </div>
+                      <div className="text-[11px] ink-faint">
+                        Prioritizing hotspots close to {home.zip}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={clearHomeZip}
+                    className="btn-ghost rounded-full px-3 py-1 text-[11px] shrink-0"
+                  >
+                    Change
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <MapPin size={15} className="rust shrink-0" />
+                    <span className="text-sm ink" style={{ fontWeight: 600 }}>Prioritize hotspots near you</span>
+                  </div>
+                  <p className="text-[11px] ink-soft leading-relaxed mb-2.5">
+                    Add your home ZIP so nearby spots rank first — trips far from home won't crowd out your local patches.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={zipInput}
+                      onChange={(e) => setZipInput(e.target.value.replace(/[^\d]/g, '').slice(0, 5))}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && !zipBusy) saveHomeZip(); }}
+                      inputMode="numeric"
+                      placeholder="ZIP code"
+                      className="flex-1 min-w-0 rounded-full px-4 py-2 text-sm"
+                      style={{ background: '#fffdf6', border: '2px solid #2a3445', color: '#2a3445' }}
+                    />
+                    <button
+                      onClick={saveHomeZip}
+                      disabled={zipBusy || zipInput.length !== 5}
+                      className="btn-ink rounded-full px-4 py-2 text-sm shrink-0 inline-flex items-center gap-1.5"
+                      style={{ opacity: zipBusy || zipInput.length !== 5 ? 0.5 : 1 }}
+                    >
+                      {zipBusy ? <RefreshCw size={13} className="animate-spin" /> : <Check size={13} strokeWidth={2.5} />}
+                      Set
+                    </button>
+                  </div>
+                  {zipError && (
+                    <div className="text-[11px] mt-2" style={{ color: '#c0392b' }}>{zipError}</div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* No locations available */}
           {!hasLocations && (
             <div className="surface-1 rounded-2xl p-5 text-center">
